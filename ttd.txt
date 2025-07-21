@@ -17,6 +17,9 @@ things to do (backend):
 
 7/10/25:
     - start using direct api calls with requests; average call is SEVEN seconds faster *jesus*
-    
+
+7/12/25:
+    - finished pokemon evolution data; works with every type of evolution (stage 1 to stage 2, stage 1 with 5 evolutoins to stage 2, etc etc)
+    - integrates requests.get() with all functions
     
     
