@@ -79,7 +79,6 @@ def get_region_locations(region: str) -> list[str]:
 
 def get_region_locations_ordered(location_list: list[str], region: str) -> list[str]:
     # Create translation table for character replacements
-    # This is much faster than multiple .replace() calls
     translation_table = str.maketrans({
         ' ': '-',
         "'": '',
