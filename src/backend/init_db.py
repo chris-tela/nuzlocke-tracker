@@ -1,7 +1,13 @@
 # initalizes database tables
 
 from db.database import engine
-from db.models import Base
+
+# remove models that you don't want to reinitialize
+from db.models import Base, AllPokemon, PartyPokemon, Version, Route, Region
+
 
 Base.metadata.create_all(bind=engine)
-print("Database tables created")
+print("Database tables created successfully!")
+print("Available tables:")
+for table in Base.metadata.tables.keys():
+    print(f"  - {table}")

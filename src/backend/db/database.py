@@ -8,7 +8,6 @@ SQLALCHEMY_DATABASE_URL = f"postgresql://{os.getenv("DATABASE_USERNAME")}:{os.ge
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 # creates all tables in the database if they dont exist
 Base = declarative_base()
-Base.metadata.create_all(bind=engine)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
