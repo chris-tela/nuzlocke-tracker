@@ -4,9 +4,9 @@ BW_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Tow
                            "Route 3", "Wellspring Cave", "Nacrene City", "Nacrene Gym", "Pinwheel Forest", "Skyarrow Bridge", "Castelia City", "Castelia Gym",
                            "Route 4", "Desert Resort", "Relic Castle", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 5", "Driftveil Drawbridge", "Driftveil City", "Cold Storage", "Driftveil Gym",
                            "Route 6", "Chargestone Cave", "Mistralton City", "Route 7", "Celestial Tower", "Mistralton Gym", "Route 17", "Route 18", "P2 Laboratory", "Mistralton Cave", "Rumination Field",
-                           "Twist Mountain", "Icirrus City", "Icirrus Gym", "Dragonspiral Tower", "Relic Castle", "Nacrene Museum", "Route 8", "Moor of Icirrus", "Tubeline Bridge", "Route 9",
+                           "Twist Mountain", "Icirrus City", "Icirrus Gym", "Dragonspiral Tower", "Nacrene Museum", "Route 8", "Moor of Icirrus", "Tubeline Bridge", "Route 9",
                            "Opelucid City", "Opelucid Gym", "Route 10", "Victory Road", "Opelucid City", "Opelucid Gym", "Victory Road",
-                           "Nuvema Town", "The Dreamyard", "The Royal Unova", "Relic Castle", "Nimbasa City", "Driftveil City", "Chargestone Cave", "Twist Mountain", "Challenger's Cave", "Opelucid City",
+                           "Nuvema Town", "The Dreamyard", "The Royal Unova", "Nimbasa City", "Driftveil City", "Twist Mountain", "Challenger's Cave", "Opelucid City",
                            "Route 11", "Village Bridge", "Route 12", "Lacunosa Town", "Route 13", "Giant Chasm", "Undella Town", "Undella Bay", "Abyssal Ruins", "Route 14", "Abundant Shrine",
                            "Black City", "White Forest", "Route 15", "Poké Transfer Lab", "Marvelous Bridge", "Route 16", "Lostlorn Forest"
                            ]
@@ -49,8 +49,8 @@ def get_region_locations_ordered(location_list: list[str], region: str) -> list[
         cleaned_loc = loc_lower.translate(translation_table)
 
         # check if location contains pokemon
-        if requests.get(f"https://pokeapi.co/api/v2/location-area/{cleaned_loc}-area").status_code != 200:
-                continue
+        # if requests.get(f"https://pokeapi.co/api/v2/location-area/{cleaned_loc}-area").status_code != 200:
+        #         continue
 
         cleaned_locations.append(cleaned_loc)
         print(cleaned_loc)
@@ -81,28 +81,112 @@ def get_region_locations(region: str) -> list[str]:
 #                                            --> version_details[list] --> version
 #                                                                      --> encounter_details[list] --> min_level (iterated), max_level (iterated), method
 
-def get_encounters(route: str, version: str) -> list[list]:
-    route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route.lower()}").json()
+def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
+    # check if location area exists, if not, check if location exists, otherwise return function
+    if route.startswith(version_name + "-route"):
+        route = route.replace(version_name, region_name)
+        route += "-area"
+
+    try:
+        route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route.lower()}").json()
+    except Exception as e:
+        try:
+            return get_location(route, region_name,version_name)
+        except Exception as e:
+            raise Exception("Location contains no encounters")
+        
+            
+
     try:
         encounters = route_area["pokemon_encounters"]
     except:
-        return Exception("Location contains no encounters")
+        raise Exception("Location contains no encounters")
 
 
     encounter_data = []
     for encounter in encounters:
         for version in encounter["version_details"]:
-            if version["version"]["name"] == version:
+            if version["version"]["name"] == version_name:
                 name = encounter["pokemon"]["name"]
-                min_level = 0
-                max_level = 100
+                min_level = 100
+                max_level = 1
                 for details in version["encounter_details"]:
                     if(min_level > details["min_level"]):
                         min_level = details["min_level"]
                     if(max_level < details["max_level"]):
                         max_level = details["max_level"]
-                encounter_data.append([name, min_level, max_level, version])
+                encounter_data.append([name, min_level, max_level, version_name, region_name])
     if encounter_data == []:
-        return Exception("Location contains no encounters")
+        raise Exception("Location contains no encounters")
 
     return encounter_data
+
+'''
+function is used when a location has multiple areas, all containing encounters that need to be condensed into a single area that isn't in the location-area api
+used as a 'helper' for get_encounters
+'''
+def get_location(location: str, region: str,  version: str) -> list[list]:
+    location = requests.get(f"https://pokeapi.co/api/v2/location/{location.lower()}").json()
+    try:
+        areas = location["areas"]
+    except areas is None:
+        raise Exception("Location contains no areas")
+    
+    if len(areas) <= 1:
+        raise Exception("Location contains one or none areas, and does not need to be condensed")
+    
+
+    areas_encounters = []
+    for area in areas:
+        try:
+            area_encounters = get_encounters(area["name"], region, version)
+            areas_encounters.append(area_encounters)
+        except Exception as e:
+            continue
+
+
+    # condense areas_encounters into a single list
+    # iterate through each pokemon, find its min and max level across all areas and add to condensed_encounters
+
+    '''
+    [[[pokemon, min, max, version], [pokemon, min, max, version]], ]]
+    '''
+  
+    condensed_encounters = []
+    pokemon_list = []
+    for x in range(len(areas_encounters)):
+        for y in range(len(areas_encounters[x])):
+            pokemon = areas_encounters[x][y][0]
+            if pokemon not in pokemon_list:
+                pokemon_list.append(pokemon)
+                min_level = areas_encounters[x][y][1]
+                max_level = areas_encounters[x][y][2]
+                condensed_encounters.append([pokemon, min_level, max_level, version, region])
+
+            else:
+                # get data for pokemon from condensed_encounters
+                for z in range(len(condensed_encounters)):
+                    if condensed_encounters[z][0] == pokemon:
+                        min_level = condensed_encounters[z][1]
+                        max_level = condensed_encounters[z][2]
+                        if min_level > areas_encounters[x][y][1]:
+                            min_level = areas_encounters[x][y][1]
+                        if max_level < areas_encounters[x][y][2]:
+                            max_level = areas_encounters[x][y][2]
+                        condensed_encounters.pop(z)
+                        condensed_encounters.append([pokemon, min_level, max_level, version, region])
+                        break
+    print(condensed_encounters)
+    return condensed_encounters
+
+
+
+
+
+    
+    
+
+
+
+
+

@@ -47,8 +47,7 @@ class PartyPokemon(Base):
 class Region(Base):
     __tablename__ = "region"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    region_id = Column(Integer, ForeignKey("region.id"), nullable=False)
+    region_id = Column(Integer, primary_key=True, nullable=False, unique=True)
     region_name = Column(String, nullable=False)
     regional_cities = Column(ARRAY(String), nullable=False)
 
@@ -58,23 +57,22 @@ class Region(Base):
 class Version(Base):
     __tablename__ = "version"
 
-    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
-    region_name = Column(String, nullable=False)
-    region_id = Column(Integer, ForeignKey("region.id"), nullable=False)
+    region_id = Column(Integer, ForeignKey("region.region_id"), nullable=False)
+    version_id = Column(Integer, primary_key=True, unique=True, nullable=False)
+    version_name = Column(String, nullable=False)
 
 
     locations_ordered = Column(ARRAY(String), nullable=False)
-
+    region = relationship("Region", back_populates="versions")
     routes = relationship("Route", back_populates="version")
 
 class Route(Base):
     __tablename__ = "route"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    route_id = Column(Integer, nullable=False)
     name = Column(String, nullable=False)  # e.g. "Route 1"
-    version_id = Column(Integer, ForeignKey("version.id"), nullable=False)
-    region_id = Column(Integer, ForeignKey("region.id"), nullable=False)
+    version_id = Column(Integer, ForeignKey("version.version_id"), nullable=False)
+    region_id = Column(Integer, ForeignKey("region.region_id"), nullable=False)
     data = Column(JSON, nullable=False)
 
     region = relationship("Region", back_populates="routes")

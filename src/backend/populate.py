@@ -104,7 +104,7 @@ def populate_region(region_id: int, db: Session = Depends(database.get_db)):
             locations_ordered = locations_ordered
         )
         '''
-    regoin = models.Region(
+    region = models.Region(
         region_id = region_id,
         region_name = region_name,
         regional_cities = regional_cities
@@ -115,61 +115,68 @@ def populate_region(region_id: int, db: Session = Depends(database.get_db)):
 
     return {"message": "Region populated successfully"}
 
-@app.post("/populate/version/{version_id}")
-def populate_version(version_id: int, db: Session = Depends(database.get_db)):
-    version = requests.get(f"https://pokeapi.co/api/v2/version/{version_id}").json()
-    version_name = version["name"]
-    version_id = version["id"]
-    ## placeholder for now
-    if version_name == "black" or version_name == "white":
-        locations_ordered = utils.get_region_locations_ordered(utils.BW_LOCATIONS_ORDERED, version_name)
-    elif version_name == "black-2" or version_name == "white-2":
-        locations_ordered = utils.get_region_locations_ordered(utils.BW2_LOCATIONS_ORDERED, version_name)
-    else:
-        locations_ordered = []
-    version = models.Version(
-        version_id = version_id,
-        version_name = version_name,
-        locations_ordered = locations_ordered
-    )
-    db.add(version)
+@app.post("/populate/versions/{region_id}")
+def populate_versions(region_id: int, db: Session = Depends(database.get_db)):
+
+    reg = db.query(models.Region).filter(models.Region.region_id == region_id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail=f"Region {region_id} not found in database.")
+
+    region = requests.get(f"https://pokeapi.co/api/v2/region/{region_id}").json()
+    for version_group in region["version_groups"]:
+        group_url = version_group["url"]
+        group = requests.get(group_url).json()
+        for versions in group["versions"]:
+            version_name = versions["name"]
+            version_id = versions["url"].split("/")[-2]
+            exists = db.query(models.Version).filter(models.Version.version_id == version_id).first()
+            if exists:
+                continue
+                ## placeholder for now
+            if version_name == "black" or version_name == "white":
+                locations_ordered = utils.get_region_locations_ordered(utils.BW_LOCATIONS_ORDERED, reg.region_name)
+            elif version_name == "black-2" or version_name == "white-2":
+                locations_ordered = utils.get_region_locations_ordered(utils.BW2_LOCATIONS_ORDERED, reg.region_name)
+            else:
+                locations_ordered = []
+
+        
+
+            version = models.Version(
+                region_id = reg.region_id,
+                version_id = version_id,
+                version_name = version_name,
+                locations_ordered = locations_ordered
+            )
+            db.add(version)
     db.commit()
     db.close()
-    return {"message": "Version populated successfully"}
+    return {"message": "Versions populated successfully"}
 
-@app.get("/versions")
-def get_versions(db: Session = Depends(database.get_db)):
-    """Get all versions in the database"""
-    versions = db.query(models.Version).all()
-    return {
-        "versions": [
-            {
-                "version_id": v.version_id,
-                "version_name": v.version_name,
-                "region_name": v.region_name,
-                "region_id": v.region_id
-            }
-            for v in versions
-        ]
-    }
+
 
 @app.post("/populate/routes/{version_id}")
-def populate_route_encounters(version_id: int, db: Session = Depends(database.get_db)):
+def populate_route(version_id: int, db: Session = Depends(database.get_db)):
     # First check if the version exists
     version = db.query(models.Version).filter(models.Version.version_id == version_id).first()
     if not version:
         raise HTTPException(status_code=404, detail=f"Version with ID {version_id} not found in database. Please populate the region first.")
+    #check if region exists
+    region = db.query(models.Region).filter(models.Region.region_id == version.region_id).first()
+    if not region:
+        raise HTTPException(status_code=404, detail=f"Region with ID {version.region_id} not found in database. Please populate the region first.")
     
     for loc in version.locations_ordered:
         try:
             loc_lower = loc.lower()
-            data = utils.get_encounters(loc_lower + "-area")
+            data = utils.get_encounters(loc_lower, region.region_name, version.version_name)
         except Exception as e:
-            print(f"Error at {loc}: {e}")
             continue
         try:
-            route_encounter = models.Route_Encounters(
+            route_encounter = models.Route(
                 name = loc_lower,
+                version_id = version.version_id,
+                region_id = version.region_id,
                 data = data
             )
             db.add(route_encounter)
