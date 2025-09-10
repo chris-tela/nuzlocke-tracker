@@ -72,7 +72,6 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
     return {"message": "Pokemon populated successfully"}
 
 # initalize all versions in the database
-# currently sample code for unova region
 @app.post("/populate/region/{region_id}")
 def populate_region(region_id: int, db: Session = Depends(database.get_db)):
     response = requests.get(f"https://pokeapi.co/api/v2/region/{region_id}")
@@ -131,12 +130,18 @@ def populate_versions(region_id: int, db: Session = Depends(database.get_db)):
             version_id = versions["url"].split("/")[-2]
             exists = db.query(models.Version).filter(models.Version.version_id == version_id).first()
             if exists:
+                print("test")
                 continue
                 ## placeholder for now
             if version_name == "black" or version_name == "white":
                 locations_ordered = utils.get_region_locations_ordered(utils.BW_LOCATIONS_ORDERED, reg.region_name)
             elif version_name == "black-2" or version_name == "white-2":
                 locations_ordered = utils.get_region_locations_ordered(utils.BW2_LOCATIONS_ORDERED, reg.region_name)
+            elif version_name == "ruby" or version_name == "sapphire":
+                print("2")
+                locations_ordered = utils.get_region_locations_ordered(utils.RUBYSAPPHIRE_LOCATIONS_ORDERED, reg.region_name)
+            elif version_name == "emerald":
+                locations_ordered = utils.get_region_locations_ordered(utils.EMERALD_LOCATIONS_ORDERED, reg.region_name)
             else:
                 locations_ordered = []
 

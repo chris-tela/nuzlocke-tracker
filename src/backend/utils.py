@@ -1,5 +1,5 @@
 import requests
-
+import re
 BW_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
                            "Route 3", "Wellspring Cave", "Nacrene City", "Nacrene Gym", "Pinwheel Forest", "Skyarrow Bridge", "Castelia City", "Castelia Gym",
                            "Route 4", "Desert Resort", "Relic Castle", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 5", "Driftveil Drawbridge", "Driftveil City", "Cold Storage", "Driftveil Gym",
@@ -20,6 +20,30 @@ BW2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20
                         "Opelucid City", "Route 9", "Opelucid Gym", "Marine Tube", "Humilau City", "Humilau Gym", "Route 22", "Route 21", "Seaside Cave", "Plasma Frigate", "Giant Chasm"
                         "Route 23", "Victory Road", "The Pokémon League"]
 
+RUBYSAPPHIRE_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Route 103 (West)", "Route 102", "Petalburg City", "Route 104", "Petalburg Woods",
+"Rustboro City", "Rustboro Gym", "Route 116", "Rusturf Tunnel", "Route 105", "Route 106", "Dewford Town", "Dewford Gym", "Granite Cave", "Route 107", "Route 108",
+"Route 109", "Slateport City", "Oceanic Museum", "Route 110", "Trick House", "Mauville City", "Mauville Gym", "Route 117", "Verdanturf Town", "Rusturf Tunnel (Revisited)",
+"Route 111 (South)", "Route 112 (South)", "Fiery Path", "Route 112 (North)", "Route 111 (North)", "Route 113", "Fallarbor Town", "Route 114", "Meteor Falls", "Route 115",
+"Route 112 (South, Revisited)", "Mt. Chimney", "Jagged Pass", "Lavaridge Town", "Lavaridge Gym", "Route 111 (Desert)", "Petalburg Gym", "New Mauville", "Route 118",
+"Route 119", "Weather Institute", "Fortree City", "Fortree Gym", "Route 120", "Scorched Slab", "Route 121", "Safari Zone", "Route 122", "Mt. Pyre", "Route 123",
+"Slateport Harbor", "Lilycove City", "Team Magma Hideout/Team Aqua Hideout", "Route 124", "Mossdeep City", "Mossdeep Gym", "Route 125", "Shoal Cave", "Route 127",
+"Route 128", "Seafloor Cavern", "Route 126", "Sootopolis City", "Cave of Origin", "Sootopolis Gym", "Route 129", "Route 130", "Mirage Island", "Route 131", "Pacifidlog Town",
+"Route 132", "Route 133", "Route 134", "Sealed Chamber", "Route 105", "Island Cave", "Route 107", "Route 108", "Abandoned Ship", "Desert Ruins", "Ancient Tomb",
+"Ever Grande City", "Victory Road", "The Pokémon League", "S.S. Tidal", "Battle Tower", "Sky Pillar"]
+
+EMERALD_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Route 103", "Route 102", "Petalburg City", "Route 104", "Petalburg Woods", "Rustboro City", "Rustboro Gym", "Route 116", "Rusturf Tunnel",
+"Route 105", "Route 106", "Dewford Town", "Dewford Gym", "Granite Cave", "Route 107", "Route 108", "Route 109", "Slateport City", "Oceanic Museum", "Route 110", "Trick House",
+"Mauville City", "Mauville Gym", "Route 117", "Verdanturf Town", "Rusturf Tunnel (Revisited)", "Route 111 (South)", "Route 112 (South)", "Fiery Path", "Route 112 (North)", "Route 111 (North)", "Route 113", "Fallarbor Town", "Route 114",
+"Meteor Falls", "Route 115", "Mt. Chimney", "Jagged Pass", "Lavaridge Town", "Lavaridge Gym", "Route 111 (Desert)", "Mirage Tower", "Petalburg Gym", "Route 115", "Route 105", "Route 107", "Route 108",
+"Abandoned Ship","New Mauville", "Route 118", "Route 119","Weather Institute", "Fortree City","Route 120", "Fortree Gym", "Route 121", "Safari Zone", "Route 122",
+"Mt. Pyre","Route 123", "Jagged Pass", "Team Magma Hideout", "Slateport City", "Lilycove City", "Team Aqua Hideout",
+"Route 124", "Mossdeep City", "Space Center", "Route 125", "Shoal Cave","Route 127", "Route 128", "Seafloor Cavern",
+"Route 126", "Sootopolis City", "Cave of Origin", "Route 129", "Route 130", "Route 131", "Pacifidlog Town",
+"Route 132", "Route 133", "Route 13", "Desert Ruins", "Island Cave", "Ancient Tomb", "Sky Pillar", "Sootopolis City",
+"Sky Pillar", "Ever Grande City", "Victory Road", "The Pokémon League",
+"Littleroot Town", "Safari Zone", "Altering Cave", "Desert Underpass","Terra Cave","Marine Cave", "Meteor Falls","Trainer Hill"]
+
+
 
 
 # goal: organize the locations by start of the game to finished in a walkthrough format
@@ -37,14 +61,20 @@ def get_region_locations_ordered(location_list: list[str], region: str) -> list[
     cleaned_locations = []
     for loc in location_list:
         loc_lower = loc.lower()
-        if cleaned_locations.__contains__(loc_lower):
-            continue
+
+        # might not be needed; sometimes games revisit routes in the walkthrough with new "access" gained
+        # if cleaned_locations.__contains__(loc_lower):
+        #     continue
         
+        # if string contains parantheses, remove it
+        if loc_lower.__contains__("(") and loc_lower.__contains__(")"):
+            loc_lower = re.sub(r"\(.*?\)", "", loc_lower)
         # Handle route prefix
         if loc_lower.startswith("route"):
             loc_lower = loc_lower.replace("route", region.lower() + "-route")
        
-
+        if loc_lower.endswith(" "):
+            loc_lower = loc_lower[:-1]
         # Apply all replacements at once using translate
         cleaned_loc = loc_lower.translate(translation_table)
 
@@ -83,8 +113,12 @@ def get_region_locations(region: str) -> list[str]:
 
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
+    # TODO: Deprecate
     if route.startswith(version_name + "-route"):
         route = route.replace(version_name, region_name)
+        route += "-area"
+
+    if route.startswith(region_name + "-route"):
         route += "-area"
 
     try:
@@ -93,6 +127,7 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
         try:
             return get_location(route, region_name,version_name)
         except Exception as e:
+            print(route + "2")
             raise Exception("Location contains no encounters")
         
             
@@ -100,6 +135,7 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
     try:
         encounters = route_area["pokemon_encounters"]
     except:
+        print(route + "1")
         raise Exception("Location contains no encounters")
 
 
@@ -117,6 +153,7 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                         max_level = details["max_level"]
                 encounter_data.append([name, min_level, max_level, version_name, region_name])
     if encounter_data == []:
+        print(route + "3")
         raise Exception("Location contains no encounters")
 
     return encounter_data
@@ -139,19 +176,21 @@ def get_location(location: str, region: str,  version: str) -> list[list]:
     areas_encounters = []
     for area in areas:
         try:
-            area_encounters = get_encounters(area["name"], region, version)
-            areas_encounters.append(area_encounters)
+            area_encounter = get_encounters(area["name"], region, version)
+            areas_encounters.append(area_encounter)
         except Exception as e:
             continue
 
 
+
+    if len(areas_encounters) == 0:
+        raise Exception()
     # condense areas_encounters into a single list
     # iterate through each pokemon, find its min and max level across all areas and add to condensed_encounters
 
     '''
     [[[pokemon, min, max, version], [pokemon, min, max, version]], ]]
     '''
-  
     condensed_encounters = []
     pokemon_list = []
     for x in range(len(areas_encounters)):
@@ -179,12 +218,6 @@ def get_location(location: str, region: str,  version: str) -> list[list]:
     print(condensed_encounters)
     return condensed_encounters
 
-
-
-
-
-    
-    
 
 
 
