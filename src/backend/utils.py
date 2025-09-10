@@ -45,7 +45,7 @@ EMERALD_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Rou
 
 
 
-
+ 
 # goal: organize the locations by start of the game to finished in a walkthrough format
 # parse cities to be readable by wrapper, and remove cities/locations that do not have any encounters
 
