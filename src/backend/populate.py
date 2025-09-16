@@ -138,10 +138,15 @@ def populate_versions(region_id: int, db: Session = Depends(database.get_db)):
             elif version_name == "black-2" or version_name == "white-2":
                 locations_ordered = utils.get_region_locations_ordered(utils.BW2_LOCATIONS_ORDERED, reg.region_name)
             elif version_name == "ruby" or version_name == "sapphire":
-                print("2")
                 locations_ordered = utils.get_region_locations_ordered(utils.RUBYSAPPHIRE_LOCATIONS_ORDERED, reg.region_name)
             elif version_name == "emerald":
                 locations_ordered = utils.get_region_locations_ordered(utils.EMERALD_LOCATIONS_ORDERED, reg.region_name)
+            elif version_name == "red" or version_name == "blue":
+                locations_ordered = utils.get_region_locations_ordered(utils.REDBLUE_LOCATIONS_ORDERED, reg.region_name)
+            elif version_name == "firered" or version_name == "leafgreen":
+                locations_ordered = utils.get_region_locations_ordered(utils.FIREREDLEAFGREEN_LOCATIONS_ORDERED, reg.region_name)
+            elif version_name == "gold" or version_name == "silver":
+                locations_ordered = utils.get_region_locations_ordered(utils.GOLDSILVER_LOCATIONS_ORDERED, reg.region_name)
             else:
                 locations_ordered = []
 

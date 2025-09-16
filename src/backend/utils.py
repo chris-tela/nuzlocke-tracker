@@ -1,5 +1,44 @@
 import requests
 import re
+
+# locations orderd in a playthrough format (scraped from bulbapedia)
+
+REDBLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)",
+"Viridian Forest", "Pewter City", "Pewter Gym", "Route 3","Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5", "Route 6",
+"Vermilion City", "S.S. Anne", "Vermilion Gym", "Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science","Route 9", "Route 10 (North)",
+"Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Underground Path (Routes 7-8)","Route 7",
+"Celadon City", "Celadon Gym","Rocket Hideout", "Pokémon Tower", "Saffron City", "Silph Co.", "Saffron Gym",
+"Route 16","Route 17", "Route 18", "Fuchsia City", "Fuchsia Gym", "Safari Zone", "Route 12", "Route 13", "Route 14", "Route 15", "Route 19", "Route 20 (East)", "Seafoam Islands", "Route 20 (West)",
+"Cinnabar Island", "Pokémon Lab", "Pokémon Mansion", "Cinnabar Gym", "Route 21", "Power Plant", "Viridian Gym",
+"Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Cerulean Cave"]
+
+FIREREDLEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)", "Viridian Forest", "Pewter City", "Pewter Gym",
+"Route 3", "Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5", "Route 6", "Vermilion City", "S.S. Anne", "Vermilion Gym",
+"Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science", "Route 9", "Route 10 (North)",
+"Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Route 7", "Celadon City","Celadon Gym", "Rocket Hideout", "Pokémon Tower",
+"Route 12", "Route 13", "Route 14", "Route 15", "Fuchsia City", "Fuchsia Gym", "Safari Zone", "Route 18", "Route 17", "Route 16",
+"Saffron City", "Silph Co.", "Fighting Dojo", "Saffron Gym", "Route 19", "Route 20 (East)", "Seafoam Islands", "Route 20 (West)",
+"Cinnabar Island", "Pokémon Lab", "Pokémon Mansion", "Cinnabar Gym", "Sevii Islands", "One Island", "Two Island", "Three Island",
+"Route 21", "Power Plant", "Viridian Gym", "Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Sevii Islands", "Four Island", "Six Island",
+"Sevii Islands", "Five Island", "Seven Island", "Cerulean Cave"]
+
+GOLDSILVER_LOCATIONS_ORDERED = [
+"New Bark Town", "Route 29","Route 46", "Cherrygrove City", "Route 30", "Mr. Pokémon's House","Professor Elm's Lab",
+"Route 31", "Violet City", "Sprout Tower", "Violet Gym", "Route 32", "Ruins of Alph", "Union Cave", "Route 33",
+"Azalea Town","Slowpoke Well", "Azalea Gym", "Ilex Forest", "Route 34", "Goldenrod City", "Goldenrod Gym",
+"Route 35", "National Park","Route 36", "Route 37", "Ecruteak City", "Burned Tower", "Ecruteak Gym", "Route 38", "Route 39",
+"Olivine City", "Route 40", "Route 41", "Cianwood City", "Cianwood Gym", "Olivine Gym", "Route 42", "Mt. Mortar",
+"Mahogany Town", "Route 43", "Lake of Rage", "Rocket Hideout", "Mahogany Gym", "Goldenrod Radio Tower", "Goldenrod Underground", "Route 44", "Ice Path",
+"Blackthorn City", "Blackthorn Gym", "Dragon's Den", "Route 45", "Dark Cave","Route 46", "Route 27", "Route 26", "Victory Road",
+"Indigo Plateau", "S.S. Aqua", "Vermilion City", "Vermilion Gym", "Route 6", "Saffron City","Saffron Gym", "Route 8", "Lavender Town", 
+"Route 10", "Rock Tunnel", "Route 9","Power Plant", "Cerulean City", "Route 24", "Route 25", "Cerulean Gym", "Route 5",
+"Route 7", "Celadon City", "Celadon Gym", "Route 16", "Route 17", "Route 18", "Fuchsia City", "Fuchsia Gym",
+"Route 15", "Route 14", "Route 13", "Route 12", "Route 11", "Diglett's Cave", "Route 2", "Pewter City", "Pewter Gym",
+"Route 3", "Mt. Moon", "Route 4", "Viridian City", "Route 1", "Pallet Town", "Route 21", "Cinnabar Island", "Route 20", "Cinnabar Gym","Route 19",
+"Viridian Gym", "Professor Oak's Lab", "Route 22", "Route 28", "Mt. Silver", "Tin Tower", "Whirl Islands", "Mt. Mortar (Revisited)"
+]
+
+
 BW_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
                            "Route 3", "Wellspring Cave", "Nacrene City", "Nacrene Gym", "Pinwheel Forest", "Skyarrow Bridge", "Castelia City", "Castelia Gym",
                            "Route 4", "Desert Resort", "Relic Castle", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 5", "Driftveil Drawbridge", "Driftveil City", "Cold Storage", "Driftveil Gym",
@@ -113,19 +152,25 @@ def get_region_locations(region: str) -> list[str]:
 
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
-    # TODO: Deprecate
-    if route.startswith(version_name + "-route"):
-        route = route.replace(version_name, region_name)
-        route += "-area"
 
-    if route.startswith(region_name + "-route"):
+
+    if route.startswith(region_name + "-route") and not route.__contains__("area"):
         route += "-area"
 
     try:
         route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route.lower()}").json()
     except Exception as e:
+        # account for sea routes ex : johto-route-40-area --> johto-sea-route-40-area
+        if route.__contains__("route") and not route.__contains__("-sea-"):
+            sea_route = route[:len(region_name)] + "-sea" + route[len(region_name):]
+            try:
+                print(sea_route)
+                get_encounters(sea_route, region_name, version_name)
+            except Exception as e:
+                    raise Exception("Location contains no encounters")
+            return
         try:
-            return get_location(route, region_name,version_name)
+            return get_location(route, region_name, version_name)
         except Exception as e:
             print(route + "2")
             raise Exception("Location contains no encounters")
@@ -155,7 +200,7 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
     if encounter_data == []:
         print(route + "3")
         raise Exception("Location contains no encounters")
-
+    print(encounter_data)
     return encounter_data
 
 '''
@@ -221,5 +266,5 @@ def get_location(location: str, region: str,  version: str) -> list[list]:
 
 
 
-
+#get_encounters("johto-route-4-area", "johto", "silver")
 
