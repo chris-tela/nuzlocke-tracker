@@ -3,7 +3,16 @@ import re
 
 # locations orderd in a playthrough format (scraped from bulbapedia)
 
-REDBLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)",
+YELLOW_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (revisited)", "Route 2 (West)",
+"Viridian Forest", "Pewter City", "Pewter Gym", "Route 3", "Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5",
+"Route 6", "Vermilion City", "S.S. Anne", "Vermilion Gym", "Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science", "Route 9", "Route 10 (North)",
+"Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Route 7",
+"Celadon City", "Celadon Gym", "Rocket Hideout", "Pokémon Tower", "Saffron City", "Silph Co.", "Saffron Gym",
+"Route 16", "Route 17", "Route 18", "Fuchsia City", "Fuchsia Gym", "Safari Zone", "Route 12", "Route 13", "Route 14", "Route 15", "Route 19", "Route 20 (East)", "Seafoam Islands", "Route 20 (West)",
+"Cinnabar Island", "Pokémon Lab", "Pokémon Mansion", "Cinnabar Gym", "Route 21", "Power Plant", "Viridian Gym",
+"Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Cerulean Cave"]
+
+RED-BLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)",
 "Viridian Forest", "Pewter City", "Pewter Gym", "Route 3","Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5", "Route 6",
 "Vermilion City", "S.S. Anne", "Vermilion Gym", "Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science","Route 9", "Route 10 (North)",
 "Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Underground Path (Routes 7-8)","Route 7",
@@ -12,7 +21,7 @@ REDBLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet 
 "Cinnabar Island", "Pokémon Lab", "Pokémon Mansion", "Cinnabar Gym", "Route 21", "Power Plant", "Viridian Gym",
 "Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Cerulean Cave"]
 
-FIREREDLEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)", "Viridian Forest", "Pewter City", "Pewter Gym",
+FIRERED-LEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)", "Viridian Forest", "Pewter City", "Pewter Gym",
 "Route 3", "Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5", "Route 6", "Vermilion City", "S.S. Anne", "Vermilion Gym",
 "Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science", "Route 9", "Route 10 (North)",
 "Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Route 7", "Celadon City","Celadon Gym", "Rocket Hideout", "Pokémon Tower",
@@ -22,7 +31,7 @@ FIREREDLEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City",
 "Route 21", "Power Plant", "Viridian Gym", "Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Sevii Islands", "Four Island", "Six Island",
 "Sevii Islands", "Five Island", "Seven Island", "Cerulean Cave"]
 
-GOLDSILVER_LOCATIONS_ORDERED = [
+GOLD-SILVER_LOCATIONS_ORDERED = [
 "New Bark Town", "Route 29","Route 46", "Cherrygrove City", "Route 30", "Mr. Pokémon's House","Professor Elm's Lab",
 "Route 31", "Violet City", "Sprout Tower", "Violet Gym", "Route 32", "Ruins of Alph", "Union Cave", "Route 33",
 "Azalea Town","Slowpoke Well", "Azalea Gym", "Ilex Forest", "Route 34", "Goldenrod City", "Goldenrod Gym",
@@ -39,7 +48,7 @@ GOLDSILVER_LOCATIONS_ORDERED = [
 ]
 
 
-BW_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
+BLACK-WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
                            "Route 3", "Wellspring Cave", "Nacrene City", "Nacrene Gym", "Pinwheel Forest", "Skyarrow Bridge", "Castelia City", "Castelia Gym",
                            "Route 4", "Desert Resort", "Relic Castle", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 5", "Driftveil Drawbridge", "Driftveil City", "Cold Storage", "Driftveil Gym",
                            "Route 6", "Chargestone Cave", "Mistralton City", "Route 7", "Celestial Tower", "Mistralton Gym", "Route 17", "Route 18", "P2 Laboratory", "Mistralton Cave", "Rumination Field",
@@ -50,7 +59,7 @@ BW_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Tow
                            "Black City", "White Forest", "Route 15", "Poké Transfer Lab", "Marvelous Bridge", "Route 16", "Lostlorn Forest"
                            ]
 
-BW2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
+BLACK-WHITE-2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
                         "Virbank City", "Virbank Complex", "Virbank Gym", "Pokéstar Studios", "Castelia City", "Castelia Sewers", "Castelia Gym",
                         "Route 4", "Desert Resort", "Relic Castle", "Join Avenue", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 16", "Lostlorn Forest"
                         "Route 5", "Driftveil Drawbridge", "Driftveil City", "Driftveil Gym", "Pokémon World Tournament", "Plasma Frigate", "Relic Passage"
@@ -128,12 +137,6 @@ def get_region_locations_ordered(location_list: list[str], region: str) -> list[
 
 
 
-def get_region_locations(region: str) -> list[str]:
-    reg = requests.get(f"https://pokeapi.co/api/v2/region/{region.lower()}").json()
-    locations = []
-    for loc in reg["locations"]:
-         locations.append(loc["name"])
-    return locations
 
 
 

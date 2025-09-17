@@ -44,26 +44,35 @@ class PartyPokemon(Base):
     pokemon = relationship("AllPokemon", back_populates="party_pokemon")
 
 
-class Region(Base):
-    __tablename__ = "region"
+class Generation(Base):
+    __tablename__ = "generation"
 
-    region_id = Column(Integer, primary_key=True, nullable=False, unique=True)
+    generation_id = Column(Integer, primary_key=True, nullable=False, unique=True)
+
+    pokemon = Column(ARRAY(String), nullable=False)
+
+    region_id = Column(Integer, unique=True, nullable=False)
     region_name = Column(String, nullable=False)
     regional_cities = Column(ARRAY(String), nullable=False)
 
-    versions = relationship("Version", back_populates="region")
-    routes = relationship("Route", back_populates="region")
+    version_groups = Column(ARRAY(String), nullable=False)
+    versions = relationship("Version", back_populates="generation")
+    routes = relationship("Route", back_populates="generation")
+
+
+
+
 
 class Version(Base):
     __tablename__ = "version"
 
-    region_id = Column(Integer, ForeignKey("region.region_id"), nullable=False)
+    generation_id = Column(Integer, ForeignKey("generation.generation_id"), nullable=False)
     version_id = Column(Integer, primary_key=True, unique=True, nullable=False)
     version_name = Column(String, nullable=False)
 
 
     locations_ordered = Column(ARRAY(String), nullable=False)
-    region = relationship("Region", back_populates="versions")
+    generation = relationship("Generation", back_populates="version")
     routes = relationship("Route", back_populates="version")
 
 class Route(Base):
@@ -72,10 +81,10 @@ class Route(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)  # e.g. "Route 1"
     version_id = Column(Integer, ForeignKey("version.version_id"), nullable=False)
-    region_id = Column(Integer, ForeignKey("region.region_id"), nullable=False)
+    region_id = Column(Integer, ForeignKey("generation.region_id"), nullable=False)
     data = Column(JSON, nullable=False)
 
-    region = relationship("Region", back_populates="routes")
+    generation = relationship("Generation", back_populates="routes")
     version = relationship("Version", back_populates="routes")
 
 

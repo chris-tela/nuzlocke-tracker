@@ -72,93 +72,80 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
     return {"message": "Pokemon populated successfully"}
 
 # initalize all versions in the database
-@app.post("/populate/region/{region_id}")
-def populate_region(region_id: int, db: Session = Depends(database.get_db)):
-    response = requests.get(f"https://pokeapi.co/api/v2/region/{region_id}")
-    region = response.json()
-    region_name = region["name"]
-    regional_cities = utils.get_region_locations(region_name)
-    '''
-    for version in region["version_groups"]:
+@app.post("/populate/generation/{generation_id}")
+def populate_generation(generation_id: int, db: Session = Depends(database.get_db)):
+    response = requests.get(f"https://pokeapi.co/api/v2/generation/{generation_id}")
+    generation = response.json()
+    pokemon_list = []
+    for pokemon in generation["pokemon_species"]:
+        pokemon_list.append(pokemon["name"])
+
+    version_groups = []
+    for version in generation["version_groups"]:
         version_name = version["name"]
-        version_url = version["url"]
-        version_data = requests.get(version_url).json()
-        version_id = int(version_data["id"])
+        if(!version_name.endswith("japan")):
+            version_groups.append(version_name)
 
-        if version_name == "black-white":
-            locations_ordered = utils.get_region_locations_ordered(utils.BW_LOCATIONS_ORDERED, region_name)
-        elif version_name == "black-2-white-2":
-            locations_ordered = utils.get_region_locations_ordered(utils.BW2_LOCATIONS_ORDERED, region_name)
-        else:
-            locations_ordered = []
+    region_details = generation["main_region"]
+    region_name = region_details["name"]
+    region_url = region_details["url"]
 
+    region_response = requests.get(region_url)
+    region_id = region_response["id"]
+    regional_cities =[]
 
-        regional_cities = utils.get_region_locations(region_name);
-        version = models.Version(
-            region_name = region_name,
-            region_id = region_id,
-            version_name = version_name,
-            version_id = version_id,
-            regional_cities = regional_cities,
-            locations_ordered = locations_ordered
-        )
-        '''
-    region = models.Region(
+    for loc in region_response["locations"]:
+        regional_cities.append(loc["name"])
+
+    generation = models.Generation(
+        generation_id = generation_id,
+        pokemon = pokemon_list,
         region_id = region_id,
         region_name = region_name,
-        regional_cities = regional_cities
-    )
-    db.add(region)
+        regional_cities = regional_cities,
+        version_groups = version_groups
+        )
+    
+
+    db.add(generation)
     db.commit()
     db.close()
 
-    return {"message": "Region populated successfully"}
+    return {"message": "Generation populated successfully"}
 
-@app.post("/populate/versions/{region_id}")
-def populate_versions(region_id: int, db: Session = Depends(database.get_db)):
+@app.post("/populate/versions/{generation_id}")
+def populate_versions(generation_id: int, db: Session = Depends(database.get_db)):
 
-    reg = db.query(models.Region).filter(models.Region.region_id == region_id).first()
-    if not reg:
-        raise HTTPException(status_code=404, detail=f"Region {region_id} not found in database.")
+    gen = db.query(models.Generation).filter(models.Generation.generation_id == generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail=f"Generation {generation_id} not found in database.")
 
-    region = requests.get(f"https://pokeapi.co/api/v2/region/{region_id}").json()
-    for version_group in region["version_groups"]:
-        group_url = version_group["url"]
-        group = requests.get(group_url).json()
-        for versions in group["versions"]:
-            version_name = versions["name"]
-            version_id = versions["url"].split("/")[-2]
-            exists = db.query(models.Version).filter(models.Version.version_id == version_id).first()
-            if exists:
-                print("test")
-                continue
-                ## placeholder for now
-            if version_name == "black" or version_name == "white":
-                locations_ordered = utils.get_region_locations_ordered(utils.BW_LOCATIONS_ORDERED, reg.region_name)
-            elif version_name == "black-2" or version_name == "white-2":
-                locations_ordered = utils.get_region_locations_ordered(utils.BW2_LOCATIONS_ORDERED, reg.region_name)
-            elif version_name == "ruby" or version_name == "sapphire":
-                locations_ordered = utils.get_region_locations_ordered(utils.RUBYSAPPHIRE_LOCATIONS_ORDERED, reg.region_name)
-            elif version_name == "emerald":
-                locations_ordered = utils.get_region_locations_ordered(utils.EMERALD_LOCATIONS_ORDERED, reg.region_name)
-            elif version_name == "red" or version_name == "blue":
-                locations_ordered = utils.get_region_locations_ordered(utils.REDBLUE_LOCATIONS_ORDERED, reg.region_name)
-            elif version_name == "firered" or version_name == "leafgreen":
-                locations_ordered = utils.get_region_locations_ordered(utils.FIREREDLEAFGREEN_LOCATIONS_ORDERED, reg.region_name)
-            elif version_name == "gold" or version_name == "silver":
-                locations_ordered = utils.get_region_locations_ordered(utils.GOLDSILVER_LOCATIONS_ORDERED, reg.region_name)
-            else:
-                locations_ordered = []
+    version_group = gen.version_group
+
+    for version in version_group:
+        url = requests.get((f"https://pokeapi.co/api/v2/version_group/{version}"))
+        version_id = url["id"]   
+
+        exists = db.query(models.Version).filter(models.Version.version_id == version_id).first()
+        if exists:
+            print("test")
+            continue
+            ## placeholder for now
+        try:
+            string = version.upper() + "_locations_ordered".upper()
+            locations_ordered = utils.get_region_locations(utils.string, gen.region_name)
+        except Exception:
+            locations_ordered = []
 
         
 
-            version = models.Version(
-                region_id = reg.region_id,
-                version_id = version_id,
-                version_name = version_name,
-                locations_ordered = locations_ordered
-            )
-            db.add(version)
+        version = models.Version(
+            generation_id = gen.generation_id,
+            version_id = version_id,
+            version_name = version,
+            locations_ordered = locations_ordered
+        )
+        db.add(version)
     db.commit()
     db.close()
     return {"message": "Versions populated successfully"}
@@ -171,22 +158,22 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
     version = db.query(models.Version).filter(models.Version.version_id == version_id).first()
     if not version:
         raise HTTPException(status_code=404, detail=f"Version with ID {version_id} not found in database. Please populate the region first.")
-    #check if region exists
-    region = db.query(models.Region).filter(models.Region.region_id == version.region_id).first()
-    if not region:
-        raise HTTPException(status_code=404, detail=f"Region with ID {version.region_id} not found in database. Please populate the region first.")
+    #check if generation exists
+    generation = db.query(models.Generation).filter(models.Generation.generation_id == version.generation_id).first()
+    if not generation:
+        raise HTTPException(status_code=404, detail=f"Generation with ID {version.generation_id} not found in database. Please populate the region first.")
     
     for loc in version.locations_ordered:
         try:
             loc_lower = loc.lower()
-            data = utils.get_encounters(loc_lower, region.region_name, version.version_name)
+            data = utils.get_encounters(loc_lower, generation.region_name, version.version_name)
         except Exception as e:
             continue
         try:
             route_encounter = models.Route(
                 name = loc_lower,
                 version_id = version.version_id,
-                region_id = version.region_id,
+                region_id = generation.region_id,
                 data = data
             )
             db.add(route_encounter)
