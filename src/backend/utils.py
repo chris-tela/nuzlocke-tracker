@@ -12,7 +12,7 @@ YELLOW_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet T
 "Cinnabar Island", "Pokémon Lab", "Pokémon Mansion", "Cinnabar Gym", "Route 21", "Power Plant", "Viridian Gym",
 "Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Cerulean Cave"]
 
-RED-BLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)",
+RED_BLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)",
 "Viridian Forest", "Pewter City", "Pewter Gym", "Route 3","Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5", "Route 6",
 "Vermilion City", "S.S. Anne", "Vermilion Gym", "Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science","Route 9", "Route 10 (North)",
 "Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Underground Path (Routes 7-8)","Route 7",
@@ -21,7 +21,7 @@ RED-BLUE_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet
 "Cinnabar Island", "Pokémon Lab", "Pokémon Mansion", "Cinnabar Gym", "Route 21", "Power Plant", "Viridian Gym",
 "Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Cerulean Cave"]
 
-FIRERED-LEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)", "Viridian Forest", "Pewter City", "Pewter Gym",
+FIRERED_LEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City", "Pallet Town (Revisited)", "Route 2 (West)", "Viridian Forest", "Pewter City", "Pewter Gym",
 "Route 3", "Mt. Moon", "Route 4", "Cerulean City", "Cerulean Gym", "Route 24", "Route 25", "Route 5", "Route 6", "Vermilion City", "S.S. Anne", "Vermilion Gym",
 "Route 11", "Diglett's Cave", "Route 2 (East)", "Pewter Museum of Science", "Route 9", "Route 10 (North)",
 "Rock Tunnel", "Route 10 (South)", "Lavender Town", "Route 8", "Route 7", "Celadon City","Celadon Gym", "Rocket Hideout", "Pokémon Tower",
@@ -31,7 +31,7 @@ FIRERED-LEAFGREEN_LOCATIONS_ORDERED = ["Pallet Town", "Route 1", "Viridian City"
 "Route 21", "Power Plant", "Viridian Gym", "Route 22", "Route 23", "Victory Road", "Indigo Plateau", "Sevii Islands", "Four Island", "Six Island",
 "Sevii Islands", "Five Island", "Seven Island", "Cerulean Cave"]
 
-GOLD-SILVER_LOCATIONS_ORDERED = [
+GOLD_SILVER_LOCATIONS_ORDERED = [
 "New Bark Town", "Route 29","Route 46", "Cherrygrove City", "Route 30", "Mr. Pokémon's House","Professor Elm's Lab",
 "Route 31", "Violet City", "Sprout Tower", "Violet Gym", "Route 32", "Ruins of Alph", "Union Cave", "Route 33",
 "Azalea Town","Slowpoke Well", "Azalea Gym", "Ilex Forest", "Route 34", "Goldenrod City", "Goldenrod Gym",
@@ -48,7 +48,7 @@ GOLD-SILVER_LOCATIONS_ORDERED = [
 ]
 
 
-BLACK-WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
+BLACK_WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
                            "Route 3", "Wellspring Cave", "Nacrene City", "Nacrene Gym", "Pinwheel Forest", "Skyarrow Bridge", "Castelia City", "Castelia Gym",
                            "Route 4", "Desert Resort", "Relic Castle", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 5", "Driftveil Drawbridge", "Driftveil City", "Cold Storage", "Driftveil Gym",
                            "Route 6", "Chargestone Cave", "Mistralton City", "Route 7", "Celestial Tower", "Mistralton Gym", "Route 17", "Route 18", "P2 Laboratory", "Mistralton Cave", "Rumination Field",
@@ -59,7 +59,7 @@ BLACK-WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Acc
                            "Black City", "White Forest", "Route 15", "Poké Transfer Lab", "Marvelous Bridge", "Route 16", "Lostlorn Forest"
                            ]
 
-BLACK-WHITE-2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
+BLACK_WHITE_2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
                         "Virbank City", "Virbank Complex", "Virbank Gym", "Pokéstar Studios", "Castelia City", "Castelia Sewers", "Castelia Gym",
                         "Route 4", "Desert Resort", "Relic Castle", "Join Avenue", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 16", "Lostlorn Forest"
                         "Route 5", "Driftveil Drawbridge", "Driftveil City", "Driftveil Gym", "Pokémon World Tournament", "Plasma Frigate", "Relic Passage"
@@ -68,7 +68,7 @@ BLACK-WHITE-2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town",
                         "Opelucid City", "Route 9", "Opelucid Gym", "Marine Tube", "Humilau City", "Humilau Gym", "Route 22", "Route 21", "Seaside Cave", "Plasma Frigate", "Giant Chasm"
                         "Route 23", "Victory Road", "The Pokémon League"]
 
-RUBYSAPPHIRE_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Route 103 (West)", "Route 102", "Petalburg City", "Route 104", "Petalburg Woods",
+RUBY_SAPPHIRE_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Route 103 (West)", "Route 102", "Petalburg City", "Route 104", "Petalburg Woods",
 "Rustboro City", "Rustboro Gym", "Route 116", "Rusturf Tunnel", "Route 105", "Route 106", "Dewford Town", "Dewford Gym", "Granite Cave", "Route 107", "Route 108",
 "Route 109", "Slateport City", "Oceanic Museum", "Route 110", "Trick House", "Mauville City", "Mauville Gym", "Route 117", "Verdanturf Town", "Rusturf Tunnel (Revisited)",
 "Route 111 (South)", "Route 112 (South)", "Fiery Path", "Route 112 (North)", "Route 111 (North)", "Route 113", "Fallarbor Town", "Route 114", "Meteor Falls", "Route 115",
@@ -96,7 +96,6 @@ EMERALD_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Rou
  
 # goal: organize the locations by start of the game to finished in a walkthrough format
 # parse cities to be readable by wrapper, and remove cities/locations that do not have any encounters
-
 def get_region_locations_ordered(location_list: list[str], region: str) -> list[str]:
     # Create translation table for character replacements
     translation_table = str.maketrans({

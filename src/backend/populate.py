@@ -83,14 +83,15 @@ def populate_generation(generation_id: int, db: Session = Depends(database.get_d
     version_groups = []
     for version in generation["version_groups"]:
         version_name = version["name"]
-        if(!version_name.endswith("japan")):
+        if(not version_name.endswith("japan")):
             version_groups.append(version_name)
 
     region_details = generation["main_region"]
     region_name = region_details["name"]
     region_url = region_details["url"]
-
-    region_response = requests.get(region_url)
+    print(region_url)
+    region_response = requests.get(region_url).json()
+    print(region_response)
     region_id = region_response["id"]
     regional_cities =[]
 
@@ -132,7 +133,7 @@ def populate_versions(generation_id: int, db: Session = Depends(database.get_db)
             continue
             ## placeholder for now
         try:
-            string = version.upper() + "_locations_ordered".upper()
+            string = version.replace("-","_").upper() + "_locations_ordered".upper()
             locations_ordered = utils.get_region_locations(utils.string, gen.region_name)
         except Exception:
             locations_ordered = []
@@ -142,7 +143,7 @@ def populate_versions(generation_id: int, db: Session = Depends(database.get_db)
         version = models.Version(
             generation_id = gen.generation_id,
             version_id = version_id,
-            version_name = version,
+            version_name = version_name,
             locations_ordered = locations_ordered
         )
         db.add(version)
