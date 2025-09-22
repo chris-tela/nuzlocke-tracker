@@ -47,6 +47,56 @@ GOLD_SILVER_LOCATIONS_ORDERED = [
 "Viridian Gym", "Professor Oak's Lab", "Route 22", "Route 28", "Mt. Silver", "Tin Tower", "Whirl Islands", "Mt. Mortar (Revisited)"
 ]
 
+CRYSTAL_LOCATIONS_ORDERED = ["New Bark Town", "Route 29", "Cherrygrove City", "Route 30", "Mr. Pokémon's House", "Professor Elm's Lab",
+"Route 31", "Violet City", "Sprout Tower", "Violet Gym", "Route 32", "Ruins of Alph", "Union Cave", "Route 33",
+"Azalea Town", "Slowpoke Well", "Azalea Gym", "Ilex Forest", "Route 34", "Goldenrod City", "Goldenrod Gym",
+"Route 35", "National Park", "Route 36", "Route 37", "Ecruteak City", "Burned Tower", "Ecruteak Gym", "Route 38", "Route 39",
+"Olivine City", "Route 40", "Route 41", "Cianwood City", "Cianwood Gym", "Olivine Gym", "Route 42", "Mt. Mortar",
+"Mahogany Town", "Route 43", "Lake of Rage", "Rocket Hideout", "Mahogany Gym", "Goldenrod Radio Tower", "Goldenrod Underground", "Tin Tower (1F)", "Route 44", "Ice Path",
+"Blackthorn City", "Blackthorn Gym", "Dragon's Den", "Route 45", "Dark Cave", "Route 46", "Route 27", "Route 26", "Victory Road",
+"Indigo Plateau", "S.S. Aqua", "Vermilion City", "Vermilion Gym", "Route 6", "Saffron City", "Saffron Gym",
+"Route 8", "Lavender Town", "Route 10", "Rock Tunnel", "Route 9", "Power Plant", "Cerulean City", "Route 24", "Route 25", "Cerulean Gym", "Route 5",
+"Route 7", "Celadon City", "Celadon Gym", "Route 16", "Route 17", "Route 18", "Fuchsia City", "Fuchsia Gym",
+"Route 15", "Route 14", "Route 13", "Route 12", "Route 11", "Diglett's Cave", "Route 2", "Pewter City", "Pewter Gym",
+"Route 3", "Mt. Moon", "Route 4", "Viridian City", "Route 1", "Pallet Town", "Route 21", "Cinnabar Island", "Route 20", "Cinnabar Gym", "Route 19",
+"Viridian Gym", "Professor Oak's Lab", "Route 22", "Route 28", "Mt. Silver", "Tin Tower (Revisited)", "Whirl Islands", "Mt. Mortar (Revisited)"]
+
+DIAMOND_PEARL_LOCATIONS_ORDERED = ["Twinleaf Town", "Verity Lakefront", "Lake Verity", "Route 201", "Sandgem Town", "Sandgem Beach", "Route 202", "Jubilife City", "Route 204", "Ravaged Path", "Route 203", "Oreburgh Gate", "Oreburgh City",
+"Route 207", "Oreburgh Mine", "Oreburgh Gym", "Route 204 (South)", "Route 204 (North)", "Floaroma Town", "Route 205 (Parts 1-2)", "Valley Windworks", "Floaroma Meadow (South)", "Eterna Forest",
+"Route 205 (Part 3)", "Eterna City", "Route 211 (West)", "Mt. Coronet (Northern Area Part 1)", "Eterna Gym", "Old Chateau", "Galactic Eterna Building", "Route 206", "Wayward Cave (Main part)", "Mt. Coronet (Southern Area Part 1)", "Route 208",
+"Hearthome City", "Amity Square", "Route 209", "Lost Tower", "Solaceon Town", "Solaceon Ruins", "Route 210 (South)", "Route 215", "Veilstone City", "Veilstone Gym",
+"Route 214", "Valor Lakefront", "Hotel Grand Lake", "Route 213", "Pastoria City", "Great Marsh", "Pastoria Gym", "Route 212", "Route 210 (North)", "Celestic Town", "Route 211 (East)", "Hearthome Gym",
+"Fuego Ironworks", "Floaroma Meadow (North)", "Sandgem Beach", "Route 219", "Route 220", "Route 221", "Route 218", "Canalave City", "Iron Island", "Canalave Gym",
+"Wayward Cave (Basement)", "Canalave Library", "Lake Valor", "Mt. Coronet (Northern Area Part 2)", "Route 216", "Route 217", "Acuity Lakefront", "Snowpoint City", "Snowpoint Gym", "Lake Acuity",
+"Galactic HQ", "Galactic Warehouse", "Mt. Coronet (Southern Area Part 2)", "Mt. Coronet (Mountainside)", "Mt. Coronet (Upper Caverns)", "Spear Pillar", "Route 222", "Sunyshore City", "Vista Lighthouse",
+"Sunyshore Gym", "Route 223", "Sinnoh Victory Road", "Sinnoh Pokémon League", "Twinleaf Town", "Pokémon Research Lab", "Route 224", "Pokémon Mansion", "Fullmoon Island", 
+"Survival Area", "Route 226", "Route 227", "Stark Mountain", "Route 228", "Route 229", "Resort Area", "Route 230"]
+
+PLATINUM_LOCATIONS_ORDERED = ["Twinleaf Town", "Route 201", "Lake Verity", "Sandgem Town", "Route 202", "Jubilife City", "Route 203", "Oreburgh Gate", "Oreburgh City", "Oreburgh Mine",
+"Oreburgh Gym", "Jubilife City", "Route 204 (south)", "Ravaged Path", "Route 204 (north)", "Floaroma Town", "Floaroma Meadow", "Valley Windworks", "Route 205 (south)", "Eterna Forest", "Route 205 (east)", "Eterna City", "Eterna Gym",
+"Eterna City", "Old Chateau", "Route 206", "Wayward Cave", "Route 207", "Mt. Coronet (south)", "Route 208", "Hearthome City", "Hearthome Gym", "Route 209",
+"Solaceon Town", "Solaceon Ruins", "Lost Tower", "Route 210 (south)", "Route 215", "Veilstone City", "Veilstone Gym", "Route 214", "Maniac Tunnel", "Valor Lakefront", "Route 213", "Pastoria City",
+"Pastoria Gym", "Route 212", "Valor Lakefront", "Route 210", "Celestic Town", "Fuego Ironworks", "Route 213", "Route 219", "Route 220", "Route 221", "Route 218", "Canalave City",
+"Iron Island", "Canalave Gym", "Canalave City", "Lake Valor", "Lake Verity", "Route 211", "Mt. Coronet (north)", "Route 216", "Route 217", "Acuity Lakefront", "Snowpoint City", "Snowpoint Gym", "Lake Acuity", "Veilstone City",
+"Mt. Coronet (south)", "Spear Pillar", "Distortion World", "Sendoff Spring", "Lake Verity", "Lake Valor", "Lake Acuity", "Route 222", "Sunyshore City",
+"Sunyshore Gym", "Route 223", "Pokémon League (south)", "Victory Road", "Pokémon League (north)", "Twinleaf Town", "Sandgem Town", "Eterna City", "Great Marsh",
+"Trophy Garden", "Pal Park", "Fullmoon Island", "Snowpoint Temple", "Spear Pillar", "Turnback Cave", "Distortion World", "Victory Road", "Route 224",
+"Fight Area", "Route 225", "Survival Area", "Route 226", "Route 227", "Stark Mountain", "Survival Area", "Stark Mountain", "Route 228", "Route 229", "Resort Area", "Route 230"]
+
+HEARTGOLD_SOULSILVER_LOCATIONS_ORDERED = ["New Bark Town", "Route 29", "Cherrygrove City", "Route 30", "Mr. Pokémon's House", "Professor Elm's Lab",
+"Route 31", "Violet City", "Sprout Tower", "Violet Gym", "Route 32", "Ruins of Alph", "Union Cave", "Route 33",
+"Azalea Town", "Slowpoke Well", "Azalea Gym", "Ilex Forest", "Route 34", "Goldenrod City", "Goldenrod Gym",
+"Route 35", "Pokéathlon Dome", "National Park", "Route 36", "Route 37", "Ecruteak City", "Burned Tower", "Ecruteak Gym", "Route 38", "Route 39",
+"Olivine City", "Olivine Lighthouse", "Route 40", "Route 41", "Cianwood City", "Cianwood Gym", "Olivine Gym", "Route 42", "Mt. Mortar",
+"Mahogany Town", "Route 43", "Lake of Rage", "Team Rocket HQ", "Mahogany Gym", "Goldenrod Radio Tower", "Goldenrod Tunnel", "Route 44", "Ice Path",
+"Blackthorn City", "Blackthorn Gym", "Dragon's Den", "Route 45", "Dark Cave", "Route 46", "Ecruteak Dance Theater", "Bellchime Trail", "Bell Tower", "Whirl Islands",
+"Route 27", "Route 26", "Victory Road", "Indigo Plateau", "S.S. Aqua", "Vermilion City", "Vermilion Gym", "Route 6", "Saffron City", "Saffron Gym",
+"Route 8", "Lavender Town", "Route 10", "Rock Tunnel", "Route 9", "Power Plant", "Cerulean City", "Route 24", "Route 25", "Cerulean Gym", "Route 5",
+"Route 7", "Celadon City", "Celadon Gym", "Route 16", "Route 17", "Route 18", "Fuchsia City", "Fuchsia Gym",
+"Route 15", "Route 14", "Route 13", "Route 12", "Route 11", "Diglett's Cave", "Route 2", "Pewter City", "Pewter Gym",
+"Route 3", "Mt. Moon", "Route 4", "Viridian City", "Route 1", "Pallet Town", "Route 21", "Cinnabar Island", "Route 20", "Cinnabar Gym", "Seafoam Islands", "Route 19",
+"Viridian Gym", "Professor Oak's Lab", "Route 22", "Route 28", "Mt. Silver", "Cerulean Cave", "Oak's Lab", "Silph Co.", "Mr. Pokémon's house",
+"Cliff Edge Gate", "Route 47", "Cliff Cave", "Embedded Tower", "Route 48", "Safari Zone Gate", "Safari Zone", "Frontier Access", "Battle Frontier"]
 
 BLACK_WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Accumula Town", "Route 2", "Striaton City", "The Dreamyard", "Striaton Gym",
                            "Route 3", "Wellspring Cave", "Nacrene City", "Nacrene Gym", "Pinwheel Forest", "Skyarrow Bridge", "Castelia City", "Castelia Gym",
@@ -59,7 +109,7 @@ BLACK_WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Acc
                            "Black City", "White Forest", "Route 15", "Poké Transfer Lab", "Marvelous Bridge", "Route 16", "Lostlorn Forest"
                            ]
 
-BLACK_WHITE_2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
+BLACK_2_WHITE_2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
                         "Virbank City", "Virbank Complex", "Virbank Gym", "Pokéstar Studios", "Castelia City", "Castelia Sewers", "Castelia Gym",
                         "Route 4", "Desert Resort", "Relic Castle", "Join Avenue", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 16", "Lostlorn Forest"
                         "Route 5", "Driftveil Drawbridge", "Driftveil City", "Driftveil Gym", "Pokémon World Tournament", "Plasma Frigate", "Relic Passage"
@@ -96,7 +146,14 @@ EMERALD_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Rou
  
 # goal: organize the locations by start of the game to finished in a walkthrough format
 # parse cities to be readable by wrapper, and remove cities/locations that do not have any encounters
-def get_region_locations_ordered(location_list: list[str], region: str) -> list[str]:
+def get_region_locations_ordered(location_list: str, region: str) -> list[str]:
+    # Get the actual list from globals using the string name
+    actual_location_list = globals().get(location_list)
+    if actual_location_list is None:
+        raise ValueError(f"Location list '{location_list}' not found in globals")
+    
+    location_list = actual_location_list
+
     # Create translation table for character replacements
     translation_table = str.maketrans({
         ' ': '-',
@@ -155,7 +212,8 @@ def get_region_locations_ordered(location_list: list[str], region: str) -> list[
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
 
-
+    print(route)
+ 
     if route.startswith(region_name + "-route") and not route.__contains__("area"):
         route += "-area"
 
@@ -166,23 +224,21 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
         if route.__contains__("route") and not route.__contains__("-sea-"):
             sea_route = route[:len(region_name)] + "-sea" + route[len(region_name):]
             try:
-                print(sea_route)
-                get_encounters(sea_route, region_name, version_name)
+                sea_encounters = get_encounters(sea_route, region_name, version_name)
+                if(not sea_encounters is None):
+                    return sea_encounters
             except Exception as e:
                     raise Exception("Location contains no encounters")
             return
         try:
             return get_location(route, region_name, version_name)
         except Exception as e:
-            print(route + "2")
             raise Exception("Location contains no encounters")
         
             
-
     try:
         encounters = route_area["pokemon_encounters"]
     except:
-        print(route + "1")
         raise Exception("Location contains no encounters")
 
 
@@ -200,9 +256,7 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                         max_level = details["max_level"]
                 encounter_data.append([name, min_level, max_level, version_name, region_name])
     if encounter_data == []:
-        print(route + "3")
         raise Exception("Location contains no encounters")
-    print(encounter_data)
     return encounter_data
 
 '''
@@ -262,11 +316,10 @@ def get_location(location: str, region: str,  version: str) -> list[list]:
                         condensed_encounters.pop(z)
                         condensed_encounters.append([pokemon, min_level, max_level, version, region])
                         break
-    print(condensed_encounters)
     return condensed_encounters
 
 
 
 
-#get_encounters("johto-route-4-area", "johto", "silver")
+#print(get_encounters("kanto-route-19-area", "kanto", "red"))
 

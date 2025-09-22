@@ -121,32 +121,40 @@ def populate_versions(generation_id: int, db: Session = Depends(database.get_db)
     if not gen:
         raise HTTPException(status_code=404, detail=f"Generation {generation_id} not found in database.")
 
-    version_group = gen.version_group
+    version_groups = gen.version_groups
+    # proportinate to generation; all versions unique to a generation
+    for version_group in version_groups:
+        url = requests.get((f"https://pokeapi.co/api/v2/version-group/{version_group}")).json()
+ 
+        version_group_name = url["name"]
 
-    for version in version_group:
-        url = requests.get((f"https://pokeapi.co/api/v2/version_group/{version}"))
-        version_id = url["id"]   
+        version_names = []
+        version_ids = []
+        for version in url["versions"]:
+            vers_id = version["url"].split("/")[-2]
+            print(vers_id)
+            exists = db.query(models.Version).filter(models.Version.version_id == vers_id).first()
+            if exists:
+                continue
 
-        exists = db.query(models.Version).filter(models.Version.version_id == version_id).first()
-        if exists:
-            print("test")
-            continue
-            ## placeholder for now
+            version_names.append(version["name"])
+            version_ids.append(vers_id)
         try:
-            string = version.replace("-","_").upper() + "_locations_ordered".upper()
-            locations_ordered = utils.get_region_locations(utils.string, gen.region_name)
-        except Exception:
-            locations_ordered = []
+            string = version_group_name.replace("-","_").upper() + "_locations_ordered".upper()
+            locations_ordered = utils.get_region_locations_ordered(string, gen.region_name)
+        except Exception as e:
+
+            continue
 
         
-
-        version = models.Version(
-            generation_id = gen.generation_id,
-            version_id = version_id,
-            version_name = version_name,
-            locations_ordered = locations_ordered
-        )
-        db.add(version)
+        for i in range(len(version_names)):
+            version = models.Version(
+                generation_id = gen.generation_id,
+                version_id = version_ids[i],
+                version_name = version_names[i],
+                locations_ordered = locations_ordered
+            )
+            db.add(version)
     db.commit()
     db.close()
     return {"message": "Versions populated successfully"}

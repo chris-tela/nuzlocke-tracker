@@ -56,8 +56,8 @@ class Generation(Base):
     regional_cities = Column(ARRAY(String), nullable=False)
 
     version_groups = Column(ARRAY(String), nullable=False)
-    versions = relationship("Version", back_populates="generation")
-    routes = relationship("Route", back_populates="generation")
+    version = relationship("Version", back_populates="generation")
+    route = relationship("Route", back_populates="generation")
 
 
 
@@ -73,7 +73,7 @@ class Version(Base):
 
     locations_ordered = Column(ARRAY(String), nullable=False)
     generation = relationship("Generation", back_populates="version")
-    routes = relationship("Route", back_populates="version")
+    route = relationship("Route", back_populates="version")
 
 class Route(Base):
     __tablename__ = "route"
@@ -84,7 +84,7 @@ class Route(Base):
     region_id = Column(Integer, ForeignKey("generation.region_id"), nullable=False)
     data = Column(JSON, nullable=False)
 
-    generation = relationship("Generation", back_populates="routes")
-    version = relationship("Version", back_populates="routes")
+    generation = relationship("Generation", back_populates="route")
+    version = relationship("Version", back_populates="route")
 
 
