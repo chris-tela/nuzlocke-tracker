@@ -211,8 +211,6 @@ def get_region_locations_ordered(location_list: str, region: str) -> list[str]:
 
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
-
-    print(route)
  
     if route.startswith(region_name + "-route") and not route.__contains__("area"):
         route += "-area"
