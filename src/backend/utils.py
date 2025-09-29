@@ -247,12 +247,16 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                 name = encounter["pokemon"]["name"]
                 min_level = 100
                 max_level = 1
+                encounter_method = [] # ex. walk, super-rod, etc
                 for details in version["encounter_details"]:
                     if(min_level > details["min_level"]):
                         min_level = details["min_level"]
                     if(max_level < details["max_level"]):
                         max_level = details["max_level"]
-                encounter_data.append([name, min_level, max_level, version_name, region_name])
+                    method = details["method"]["name"]
+                    if(not encounter_method.__contains__(method)):
+                        encounter_method.append(method)
+                encounter_data.append([name, min_level, max_level, version_name, region_name, encounter_method])
     if encounter_data == []:
         raise Exception("Location contains no encounters")
     return encounter_data
