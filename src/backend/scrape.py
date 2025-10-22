@@ -1,421 +1,1106 @@
+
 import requests
 from bs4 import BeautifulSoup
+import json
+import sys
 import re
 
-def _extract_location_from_context(context_text):
-    """Extract location from context text around a trainers section"""
-    # Look for location patterns in the context
-    location_patterns = [
-        # Numbered sections like "1 Route 20" or "2.1 Aspertia City"
-        r'^\d+(?:\.\d+)?\s*([A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))',
-        # Simple location names on their own line
-        r'^([A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))$',
-        # Location names at the start of a line
-        r'^([A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))',
-    ]
-    
-    # Split into lines and look for location patterns
-    lines = context_text.split('\n')
-    for line in reversed(lines):  # Look from bottom up (most recent first)
-        line = line.strip()
+def scrape_trainers(url):
+    """
+    Scrape trainer information from Pokemon DB and return structured data
+    """
+    try:
+        # Fetch the webpage
+        response = requests.get(url)
+        response.raise_for_status()
         
-        # Skip lines that are too long (likely not section headers)
-        if len(line) > 100:
-            continue
+        # Parse HTML with Beautiful Soup
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        trainers_data = []
+        
+        # Find all gym sections with h2 elements that have gym IDs
+        gym_sections = soup.find_all('h2', id=re.compile(r'gym-\d+'))
+        
+        for gym_section in gym_sections:
+            gym_id = gym_section.get('id', '')
+            gym_number = gym_id.replace('gym-', '') if gym_id else ''
             
-        # Skip lines that contain trainer-related text (likely not location headers)
-        if any(word in line.lower() for word in ['trainer', 'pokemon', 'reward', 'lv.', 'item']):
-            continue
+            # Extract location from the header text
+            location = gym_section.get_text(strip=True)
             
-        for pattern in location_patterns:
-            match = re.search(pattern, line, re.MULTILINE)
-            if match:
-                location = match.group(1).strip()
-                # Clean up the location name
-                location = re.sub(r'^\d+(?:\.\d+)?\s*', '', location)  # Remove leading numbers
-                location = location.split('\n')[0]  # Take first line if multiline
-                location = location.split(' ')[0] if len(location.split(' ')) > 3 else location  # Take first few words if too long
-                
-                # Validate the location name
-                if (len(location) > 2 and len(location) < 30 and 
-                    not any(word in location.lower() for word in ['trainer', 'pokemon', 'reward', 'item', 'level', 'type', 'ability'])):
-                    return location
-    
-    return "Unknown Location"
-
-def _build_section_location_map(soup):
-    """Build a map of text positions to section locations by analyzing HTML structure"""
-    section_locations = []
-    text_content = soup.get_text()
-    
-    # Find all heading elements (h1, h2, h3, h4, h5, h6)
-    for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
-        heading_text = heading.get_text().strip()
-        
-        # Look for location patterns in headings
-        location_patterns = [
-            r'^\d+(?:\.\d+)?\s*([A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))',
-            r'^([A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))',
-        ]
-        
-        for pattern in location_patterns:
-            match = re.search(pattern, heading_text)
-            if match:
-                location = match.group(1).strip()
-                # Clean up the location name
-                location = re.sub(r'^\d+(?:\.\d+)?\s*', '', location)
-                location = location.split('\n')[0]
-                
-                if (len(location) > 2 and len(location) < 50 and
-                    not any(word in location.lower() for word in ['trainer', 'pokemon', 'reward', 'item', 'level', 'type', 'ability'])):
-                    
-                    # Find the position of this heading in the text
-                    pos = text_content.find(heading_text)
-                    if pos != -1:
-                        section_locations.append({
-                            'position': pos,
-                            'location': location,
-                            'heading_level': heading.name
-                        })
+            # Find trainer cards within this gym section
+            # Look for trainer cards that come after this h2 element
+            current = gym_section.find_next_sibling()
+            gym_trainers = []
+            
+            while current:
+                # Stop if we hit another h2 element (next gym)
+                if current.name == 'h2':
                     break
-    
-    # Also look for location patterns in the text content directly
-    # This catches locations that might not be in headings
-    location_patterns = [
-        r'\n(\d+(?:\.\d+)?\s*[A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))\n',
-        r'\n([A-Z][A-Za-z\s]+(?:City|Town|Gym|Route|Cave|Forest|Mountain|Beach|Island|Complex|Building|House|Area|Zone|Place|Spot))\n',
-    ]
-    
-    for pattern in location_patterns:
-        for match in re.finditer(pattern, text_content):
-            location = match.group(1).strip()
-            # Clean up the location name
-            location = re.sub(r'^\d+(?:\.\d+)?\s*', '', location)
-            location = location.split('\n')[0]
-            
-            if (len(location) > 2 and len(location) < 50 and
-                not any(word in location.lower() for word in ['trainer', 'pokemon', 'reward', 'item', 'level', 'type', 'ability'])):
                 
-                section_locations.append({
-                    'position': match.start(),
-                    'location': location,
-                    'heading_level': 'text'
-                })
-    
-    # Sort by position
-    section_locations.sort(key=lambda x: x['position'])
-    
-    return section_locations
-
-def _find_trainer_location(trainer_position, section_locations, text_content):
-    """Find the most recent section location before a trainer position"""
-    # Find the most recent section before the trainer
-    current_location = "Unknown Location"
-    
-    for section in reversed(section_locations):
-        if section['position'] < trainer_position:
-            # Additional validation: check if this section is close enough to the trainer
-            # and if there are any "Trainers" sections between this location and the trainer
-            text_between = text_content[section['position']:trainer_position]
+                # Look for trainer cards in this element
+                trainer_cards = current.find_all('span', class_='infocard trainer-head')
+                for card in trainer_cards:
+                    trainer_data = extract_trainer_from_card(card)
+                    if trainer_data:
+                        trainer_data["location"] = location
+                        gym_trainers.append(trainer_data)
+                
+                current = current.find_next_sibling()
             
-            # If there's a "Trainers" section between the location and trainer, it's likely the right location
-            if "Trainers" in text_between:
-                current_location = section['location']
+            # Add gym trainers to the main list
+            trainers_data.extend(gym_trainers)
+        
+        # Sort trainers by gym number
+        trainers_data.sort(key=lambda x: extract_gym_number_from_location(x.get("location", "")))
+        
+        return trainers_data
+        
+    except Exception as e:
+        print(f"Error scraping data: {e}")
+        return []
+
+def extract_gym_number_from_location(location):
+    """
+    Extract gym number from location text for sorting
+    """
+    try:
+        match = re.search(r'Gym #(\d+)', location)
+        if match:
+            return int(match.group(1))
+        return 999  # Put non-gym trainers at the end
+    except:
+        return 999
+
+def is_element_after(element, reference_element):
+    """
+    Check if an element comes after a reference element in the DOM
+    """
+    try:
+        # Get all elements in the same parent
+        parent = reference_element.parent
+        if not parent:
+            return False
+        
+        # Find the position of the reference element
+        reference_pos = None
+        element_pos = None
+        
+        for i, child in enumerate(parent.find_all(recursive=False)):
+            if child == reference_element:
+                reference_pos = i
+            if child == element:
+                element_pos = i
+        
+        # Return True if element comes after reference element
+        if reference_pos is not None and element_pos is not None:
+            return element_pos > reference_pos
+        
+        return False
+        
+    except Exception as e:
+        print(f"Error checking element position: {e}")
+        return False
+
+def extract_trainer_from_card(card):
+    """
+    Extract trainer data from a trainer card using the specific CSS selectors
+    """
+    try:
+        trainer_data = {
+            "location": "",
+            "trainer name": "",
+            "trainer.png": "",
+            "badge name": "",
+            "badge type": "",
+            "pokemon": []
+        }
+        
+        # Extract trainer name from <span class="ent-name">
+        trainer_name_span = card.find('span', class_='ent-name')
+        if trainer_name_span:
+            trainer_data["trainer name"] = trainer_name_span.get_text(strip=True)
+        
+        # Extract trainer image from <img class="img-fixed img-trainer-v11">
+        trainer_img = card.find('img', class_='img-fixed img-trainer-v11')
+        if trainer_img and trainer_img.get('src'):
+            trainer_data["trainer.png"] = trainer_img['src']
+        
+        # Extract badge type from <span class="itype {type}">
+        type_spans = card.find_all('span', class_=re.compile(r'itype'))
+        for type_span in type_spans:
+            # Extract the text content from the span
+            badge_type = type_span.get_text(strip=True)
+            if badge_type:
+                trainer_data["badge type"] = badge_type
                 break
-            # If no "Trainers" section but this is the closest location, use it
-            elif current_location == "Unknown Location":
-                current_location = section['location']
-    
-    return current_location
-
-def scrape_page_content(url):
-    """Scrape a webpage and return content with font size information"""
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
         
-        soup = BeautifulSoup(response.text, "html.parser")
+        # Extract badge name from the text content
+        badge_match = re.search(r'(\w+)\s+Badge', card.get_text(), re.I)
+        if badge_match:
+            trainer_data["badge name"] = badge_match.group(1) + " Badge"
         
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
+        # Look for Pokemon data that belongs specifically to this trainer
+        # Find Pokemon cards that are in the same container as this trainer card
+        pokemon_data = []
         
-        # Get page title
-        title = soup.title.string if soup.title else "No title found"
-        
-        # Extract content with font size information
-        content_with_styles = []
-        
-        # Find all elements that contain text
-        for element in soup.find_all(text=True):
-            if element.strip():  # Only process non-empty text nodes
-                parent = element.parent
-                if parent:
-                    # Get font size from various sources
-                    font_size = None
-                    
-                    # Check inline style
-                    if parent.get('style'):
-                        style_match = re.search(r'font-size:\s*([^;]+)', parent.get('style'))
-                        if style_match:
-                            font_size = style_match.group(1).strip()
-                    
-                    # Check class-based font sizes (common in Bulbapedia)
-                    if parent.get('class'):
-                        classes = parent.get('class')
-                        for cls in classes:
-                            if 'font-size' in cls or any(size in cls for size in ['large', 'medium', 'small', 'tiny']):
-                                font_size = cls
-                    
-                    # Check if it's a heading (h1, h2, etc.) - these typically have larger fonts
-                    if parent.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                        font_size = f"heading-{parent.name}"
-                    
-                    content_with_styles.append({
-                        'text': element.strip(),
-                        'font_size': font_size or 'default',
-                        'tag': parent.name if parent else 'unknown'
-                    })
-        
-        # Also get plain text for comparison
-        text_content = soup.get_text()
-        lines = (line.strip() for line in text_content.splitlines())
-        chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-        text = '\n'.join(chunk for chunk in chunks if chunk)
-        plain_lines = [line for line in text.split('\n') if line.strip()]
-        
-        return {
-            'title': title,
-            'url': url,
-            'total_lines': len(plain_lines),
-            'ordered_content': plain_lines,
-            'content_with_styles': content_with_styles
-        }
-        
-    except requests.RequestException as e:
-        return {'error': f"Request failed: {e}"}
-    except Exception as e:
-        return {'error': f"Scraping failed: {e}"}
-
-def print_ordered_content(data):
-    """Print the scraped content in original page order (top to bottom)"""
-    if 'error' in data:
-        print(f"Error: {data['error']}")
-        return
-    
-    print("=" * 80)
-    print(f"PAGE TITLE: {data['title']}")
-    print(f"URL: {data['url']}")
-    print(f"TOTAL LINES: {data['total_lines']}")
-    print("=" * 80)
-    print("\nPAGE CONTENT (Top to Bottom):")
-    print("-" * 80)
-    
-    for i, line in enumerate(data['ordered_content'], 1):
-        print(f"{i:4d}: {line}")
-    
-    print("-" * 80)
-    print(f"Total lines processed: {len(data['ordered_content'])}")
-
-def print_content_with_font_sizes(data):
-    """Print the scraped content with font size information"""
-    if 'error' in data:
-        print(f"Error: {data['error']}")
-        return
-    
-    print("=" * 80)
-    print(f"PAGE TITLE: {data['title']}")
-    print(f"URL: {data['url']}")
-    print(f"TOTAL TEXT ELEMENTS: {len(data['content_with_styles'])}")
-    print("=" * 80)
-    print("\nCONTENT WITH FONT SIZES (Top to Bottom):")
-    print("-" * 80)
-    
-    for i, item in enumerate(data['content_with_styles'], 1):
-        font_info = f"[{item['font_size']}]" if item['font_size'] != 'default' else "[default]"
-        tag_info = f"<{item['tag']}>" if item['tag'] != 'unknown' else ""
-        print(f"{i:4d}: {font_info} {tag_info} {item['text']}")
-    
-    print("-" * 80)
-    print(f"Total text elements processed: {len(data['content_with_styles'])}")
-
-def scrape_full_html(url):
-    """Scrape a webpage and return the complete HTML content"""
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # Get page title
-        title = soup.title.string if soup.title else "No title found"
-        
-        # Return the complete HTML as a string
-        html_content = soup.prettify()
-        
-        return {
-            'title': title,
-            'url': url,
-            'html_content': html_content,
-            'total_lines': len(html_content.split('\n'))
-        }
-        
-    except requests.RequestException as e:
-        return {'error': f"Request failed: {e}"}
-    except Exception as e:
-        return {'error': f"Scraping failed: {e}"}
-
-def print_full_html(data):
-    """Print the complete HTML content from top to bottom"""
-    if 'error' in data:
-        print(f"Error: {data['error']}")
-        return
-    
-    print("=" * 80)
-    print(f"PAGE TITLE: {data['title']}")
-    print(f"URL: {data['url']}")
-    print(f"TOTAL HTML LINES: {data['total_lines']}")
-    print("=" * 80)
-    print("\nCOMPLETE HTML CONTENT (Top to Bottom):")
-    print("-" * 80)
-    
-    # Split HTML into lines and print with line numbers
-    html_lines = data['html_content'].split('\n')
-    for i, line in enumerate(html_lines, 1):
-        print(f"{i:6d}: {line}")
-    
-    print("-" * 80)
-    print(f"Total HTML lines: {len(html_lines)}")
-
-def extract_trainer_names(url):
-    """Extract all trainer names and locations from a Bulbapedia walkthrough page in order of appearance"""
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, "html.parser")
-        
-        # Get page title
-        title = soup.title.string if soup.title else "No title found"
-        
-        # First, build a map of sections and their locations by analyzing HTML structure
-        section_locations = _build_section_location_map(soup)
-        
-        # Find all trainer entries using Bulbapedia's trainer template structure
-        trainer_data = []
-        
-        # Get all text content and search for trainer patterns
-        text_content = soup.get_text()
-        
-        # More specific patterns based on the actual output we saw
-        trainer_patterns = [
-            # Pattern 1: "Class Name" followed by reward
-            r'(Youngster\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Lass\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(School Kid\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Leader\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Hiker\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Janitor\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(PKMN Trainer\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Trainer\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Twins\s+[A-Za-z\s&]+)\s+Reward:\s*\$[\d,]+',
-            r'(Nursery Aide\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Preschooler\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Pokémon Ranger\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+',
-            r'(Team Plasma Grunt)\s+Reward:\s*\$[\d,]+',
+        # Look for Pokemon cards in the same parent container
+        parent_container = card.parent
+        if parent_container:
+            # Find Pokemon cards that are siblings of this trainer card
+            pokemon_cards = parent_container.find_all('div', class_='infocard trainer-pkmn')
             
-            # Pattern 2: Special cases with additional text
-            r'(Pokémon Ranger\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+Autumn only',
-            r'(Pokémon Ranger\s+[A-Za-z]+)\s+Reward:\s*\$[\d,]+Requires',
+            # Only take Pokemon cards that come after this trainer card but before the next trainer card
+            for pokemon_card in pokemon_cards:
+                # Check if this Pokemon card comes after the trainer card
+                if is_element_after(pokemon_card, card):
+                    # Check if there's another trainer card between this trainer and the Pokemon
+                    has_trainer_between = False
+                    for trainer_card in parent_container.find_all('span', class_='infocard trainer-head'):
+                        if (is_element_after(trainer_card, card) and 
+                            is_element_after(pokemon_card, trainer_card)):
+                            has_trainer_between = True
+                            break
+                    
+                    # Only add Pokemon if there's no trainer between this trainer and the Pokemon
+                    if not has_trainer_between:
+                        pokemon_info = extract_pokemon_from_pokemon_card(pokemon_card)
+                        if pokemon_info:
+                            pokemon_data.append(pokemon_info)
+        
+        trainer_data["pokemon"] = pokemon_data
+        
+        return trainer_data
+        
+    except Exception as e:
+        print(f"Error extracting trainer from card: {e}")
+        return None
+
+def extract_pokemon_from_pokemon_card(pokemon_card):
+    """
+    Extract Pokemon data from a single Pokemon card
+    """
+    try:
+        # Find the data section
+        data_section = pokemon_card.find('span', class_='infocard-lg-data text-muted')
+        if not data_section:
+            return None
+        
+        # Extract Pokemon name from <a class="ent-name">
+        pokemon_name_link = data_section.find('a', class_='ent-name')
+        if not pokemon_name_link:
+            return None
+        
+        pokemon_name = pokemon_name_link.get_text(strip=True)
+        
+        # Extract Pokemon ID from first <small> element
+        small_elements = data_section.find_all('small')
+        pokemon_id = ""
+        if small_elements:
+            id_text = small_elements[0].get_text(strip=True)
+            id_match = re.search(r'#(\d+)', id_text)
+            if id_match:
+                pokemon_id = id_match.group(1)
+        
+        # Extract level from second <small> element (Level X)
+        level = ""
+        if len(small_elements) >= 2:
+            level_text = small_elements[1].get_text(strip=True)
+            level_match = re.search(r'Level (\d+)', level_text)
+            if level_match:
+                level = level_match.group(1)
+        
+        pokemon_data = {
+            "name": pokemon_name,
+            "id": pokemon_id,
+            "level": level
+        }
+        
+        return pokemon_data
+        
+    except Exception as e:
+        print(f"Error extracting Pokemon from Pokemon card: {e}")
+        return None
+
+def extract_pokemon_from_card(card):
+    """
+    Extract Pokemon data from the trainer card itself
+    """
+    pokemon_list = []
+    
+    try:
+        # Look for Pokemon links in the card
+        pokemon_links = card.find_all('a', href=re.compile(r'pokemon', re.I))
+        
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                # Try to find level in the same element or nearby
+                level = extract_level_from_text(link.parent.get_text())
+                
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",  # Would need Pokemon ID lookup
+                    "level": level
+                }
+                pokemon_list.append(pokemon_data)
+        
+        return pokemon_list
+        
+    except Exception as e:
+        print(f"Error extracting Pokemon from card: {e}")
+        return []
+
+def parse_pokemondb_gym_leaders(soup):
+    """
+    Parse gym leaders from Pokemon DB structure
+    """
+    trainers = []
+    
+    try:
+        # Look for gym leader sections
+        gym_sections = soup.find_all(['h2', 'h3'], string=re.compile(r'gym.*#\d+', re.I))
+        
+        for section in gym_sections:
+            # Get the gym number and city
+            gym_text = section.get_text()
+            gym_match = re.search(r'Gym #(\d+),?\s*(.+)', gym_text, re.I)
+            if gym_match:
+                gym_num = gym_match.group(1)
+                city = gym_match.group(2).strip()
+                
+                # Find trainer data in the following content
+                trainer_data = extract_gym_leader_data(section, city, gym_num)
+                if trainer_data:
+                    trainers.extend(trainer_data)
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error parsing Pokemon DB gym leaders: {e}")
+        return []
+
+def parse_pokemondb_elite_four(soup):
+    """
+    Parse elite four from Pokemon DB structure
+    """
+    trainers = []
+    
+    try:
+        # Look for elite four sections
+        elite_sections = soup.find_all(['h2', 'h3'], string=re.compile(r'elite four', re.I))
+        
+        for section in elite_sections:
+            # Find trainer data in the following content
+            trainer_data = extract_elite_four_data(section)
+            if trainer_data:
+                trainers.extend(trainer_data)
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error parsing Pokemon DB elite four: {e}")
+        return []
+
+def parse_pokemondb_other_trainers(soup):
+    """
+    Parse other trainers from Pokemon DB structure
+    """
+    trainers = []
+    
+    try:
+        # Look for other trainer sections
+        other_sections = soup.find_all(['h2', 'h3'], string=re.compile(r'other trainers', re.I))
+        
+        for section in other_sections:
+            # Find trainer data in the following content
+            trainer_data = extract_other_trainer_data(section)
+            if trainer_data:
+                trainers.extend(trainer_data)
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error parsing Pokemon DB other trainers: {e}")
+        return []
+
+def extract_gym_leader_data(section, city, gym_num):
+    """
+    Extract gym leader data from a section
+    """
+    trainers = []
+    
+    try:
+        # Find the next sibling elements that contain trainer data
+        current = section.find_next_sibling()
+        
+        while current:
+            # Look for trainer names and Pokemon data
+            trainer_name = extract_trainer_name_from_element(current)
+            if trainer_name:
+                pokemon_data = extract_pokemon_from_element(current)
+                badge_data = extract_badge_from_element(current)
+                
+                trainer_data = {
+                    "location": city,
+                    "trainer name": trainer_name,
+                    "trainer.png": "",
+                    "badge name": badge_data.get("name", ""),
+                    "badge type": badge_data.get("type", ""),
+                    "pokemon": pokemon_data
+                }
+                trainers.append(trainer_data)
+            
+            # Move to next sibling
+            current = current.find_next_sibling()
+            
+            # Stop if we hit another major section
+            if current and current.name in ['h2', 'h3']:
+                break
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error extracting gym leader data: {e}")
+        return []
+
+def extract_elite_four_data(section):
+    """
+    Extract elite four data from a section
+    """
+    trainers = []
+    
+    try:
+        # Find the next sibling elements that contain trainer data
+        current = section.find_next_sibling()
+        
+        while current:
+            # Look for trainer names and Pokemon data
+            trainer_name = extract_trainer_name_from_element(current)
+            if trainer_name:
+                pokemon_data = extract_pokemon_from_element(current)
+                
+                trainer_data = {
+                    "location": "Elite Four",
+                    "trainer name": trainer_name,
+                    "trainer.png": "",
+                    "badge name": "",
+                    "badge type": "",
+                    "pokemon": pokemon_data
+                }
+                trainers.append(trainer_data)
+            
+            # Move to next sibling
+            current = current.find_next_sibling()
+            
+            # Stop if we hit another major section
+            if current and current.name in ['h2', 'h3']:
+                break
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error extracting elite four data: {e}")
+        return []
+
+def extract_other_trainer_data(section):
+    """
+    Extract other trainer data from a section
+    """
+    trainers = []
+    
+    try:
+        # Find the next sibling elements that contain trainer data
+        current = section.find_next_sibling()
+        
+        while current:
+            # Look for trainer names and Pokemon data
+            trainer_name = extract_trainer_name_from_element(current)
+            if trainer_name:
+                pokemon_data = extract_pokemon_from_element(current)
+                
+                trainer_data = {
+                    "location": "",
+                    "trainer name": trainer_name,
+                    "trainer.png": "",
+                    "badge name": "",
+                    "badge type": "",
+                    "pokemon": pokemon_data
+                }
+                trainers.append(trainer_data)
+            
+            # Move to next sibling
+            current = current.find_next_sibling()
+            
+            # Stop if we hit another major section
+            if current and current.name in ['h2', 'h3']:
+                break
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error extracting other trainer data: {e}")
+        return []
+
+def extract_trainer_name_from_element(element):
+    """
+    Extract trainer name from an element
+    """
+    try:
+        # Look for bold text that might be trainer names
+        bold_elements = element.find_all(['b', 'strong'])
+        for bold in bold_elements:
+            text = bold.get_text(strip=True)
+            if text and len(text) > 1 and not text.isdigit():
+                # Clean up the text to get just the trainer name
+                clean_name = clean_trainer_name(text)
+                if clean_name:
+                    return clean_name
+        
+        # Look for text that might be trainer names
+        text = element.get_text(strip=True)
+        if text and len(text) > 1 and not text.isdigit():
+            clean_name = clean_trainer_name(text)
+            if clean_name:
+                return clean_name
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error extracting trainer name: {e}")
+        return None
+
+def clean_trainer_name(text):
+    """
+    Clean up trainer name by extracting just the name part
+    """
+    try:
+        # Remove common suffixes and prefixes
+        text = re.sub(r'\(.*?\)', '', text)  # Remove parentheses content
+        text = re.sub(r'Badge.*', '', text)  # Remove badge info
+        text = re.sub(r'type.*', '', text)   # Remove type info
+        text = re.sub(r'#\d+.*', '', text)  # Remove Pokemon numbers
+        text = re.sub(r'Level \d+.*', '', text)  # Remove level info
+        
+        # Clean up whitespace
+        text = text.strip()
+        
+        # Return only if it's a reasonable length and doesn't contain numbers
+        if 2 <= len(text) <= 20 and not re.search(r'\d', text):
+            return text
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error cleaning trainer name: {e}")
+        return None
+
+def extract_pokemon_from_element(element):
+    """
+    Extract Pokemon data from an element
+    """
+    pokemon_list = []
+    
+    try:
+        # Look for Pokemon links
+        pokemon_links = element.find_all('a', href=re.compile(r'pokemon', re.I))
+        
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                # Try to find level in the same element
+                level = extract_level_from_text(element.get_text())
+                
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",  # Would need Pokemon ID lookup
+                    "level": level
+                }
+                pokemon_list.append(pokemon_data)
+        
+        # Also look for Pokemon mentioned in text without links
+        text = element.get_text()
+        pokemon_names = extract_pokemon_names_from_text(text)
+        for pokemon_name in pokemon_names:
+            level = extract_level_from_text(text)
+            pokemon_data = {
+                "name": pokemon_name,
+                "id": "",
+                "level": level
+            }
+            pokemon_list.append(pokemon_data)
+        
+        return pokemon_list
+        
+    except Exception as e:
+        print(f"Error extracting Pokemon from element: {e}")
+        return []
+
+def extract_pokemon_names_from_text(text):
+    """
+    Extract Pokemon names from text content
+    """
+    pokemon_names = []
+    
+    try:
+        # Look for Pokemon names that are mentioned in the text
+        # This is a simple approach - could be improved with a Pokemon name database
+        pokemon_patterns = [
+            r'Lillipup', r'Pansage', r'Pansear', r'Panpour', r'Herdier', r'Watchog',
+            r'Whirlipede', r'Dwebble', r'Leavanny', r'Emolga', r'Zebstrika',
+            r'Krokorok', r'Palpitoad', r'Excadrill', r'Swoobat', r'Unfezant', r'Swanna',
+            r'Vanillish', r'Cryogonal', r'Beartic', r'Fraxure', r'Druddigon', r'Haxorus',
+            r'Cofagrigus', r'Jellicent', r'Golurk', r'Chandelure', r'Scrafty', r'Liepard',
+            r'Krookodile', r'Bisharp', r'Reuniclus', r'Musharna', r'Sigilyph', r'Gothitelle',
+            r'Throh', r'Sawk', r'Conkeldurr', r'Mienshao', r'Accelgor', r'Bouffalant',
+            r'Vanilluxe', r'Escavalier', r'Volcarona', r'Zekrom', r'Reshiram', r'Carracosta',
+            r'Archeops', r'Zoroark', r'Klinklang', r'Seismitoad', r'Eelektross', r'Hydreigon'
         ]
         
-        # Find all matches with their positions to preserve order
-        for pattern in trainer_patterns:
-            for match in re.finditer(pattern, text_content):
-                trainer_name = match.group(1).strip()
-                
-                # Find the location using the section map
-                location = _find_trainer_location(match.start(), section_locations, text_content)
-                
-                # Check if this trainer is already in our list
-                trainer_exists = any(data['name'] == trainer_name for data in trainer_data)
-                
-                if not trainer_exists:
-                    trainer_data.append({
-                        'name': trainer_name,
-                        'location': location,
-                        'position': match.start()
-                    })
+        for pattern in pokemon_patterns:
+            matches = re.findall(pattern, text, re.I)
+            for match in matches:
+                if match not in pokemon_names:
+                    pokemon_names.append(match)
         
-        # Sort by position to maintain document order
-        trainer_data.sort(key=lambda x: x['position'])
+        return pokemon_names
         
-        # Extract just the names for backward compatibility
-        trainer_names = [data['name'] for data in trainer_data]
+    except Exception as e:
+        print(f"Error extracting Pokemon names from text: {e}")
+        return []
+
+def extract_badge_from_element(element):
+    """
+    Extract badge information from an element
+    """
+    try:
+        # Look for badge information
+        badge_text = element.get_text()
+        badge_match = re.search(r'(\w+)\s+Badge', badge_text, re.I)
+        if badge_match:
+            badge_name = badge_match.group(1) + " Badge"
+            return {"name": badge_name, "type": ""}
         
-        return {
-            'title': title,
-            'url': url,
-            'trainer_names': trainer_names,
-            'trainer_data': trainer_data,  # Full data with locations
-            'total_trainers': len(trainer_names)
+        return {"name": "", "type": ""}
+        
+    except Exception as e:
+        print(f"Error extracting badge: {e}")
+        return {"name": "", "type": ""}
+
+def parse_bulbapedia_table(table):
+    """
+    Parse trainer information from Bulbapedia table structure
+    """
+    trainers = []
+    
+    try:
+        # Look for gym leader information in the table
+        rows = table.find_all('tr')
+        
+        for row in rows:
+            cells = row.find_all(['td', 'th'])
+            if len(cells) < 2:
+                continue
+                
+            # Check if this row contains gym leader information
+            text_content = ' '.join([cell.get_text(strip=True) for cell in cells])
+            
+            # Look for gym leader patterns
+            if any(keyword in text_content.lower() for keyword in ['gym', 'leader', 'roxie', 'badge']):
+                trainer_data = parse_bulbapedia_row(row)
+                if trainer_data:
+                    trainers.append(trainer_data)
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error parsing Bulbapedia table: {e}")
+        return []
+
+def parse_gym_leaders(soup):
+    """
+    Parse gym leader information from the page
+    """
+    trainers = []
+    
+    try:
+        # Look for Roxie specifically (gym leader)
+        roxie_sections = soup.find_all(string=re.compile(r'Roxie', re.I))
+        
+        for section in roxie_sections:
+            parent = section.parent
+            while parent and parent.name != 'body':
+                # Look for trainer data in the parent structure
+                trainer_data = extract_trainer_from_section(parent)
+                if trainer_data:
+                    trainers.append(trainer_data)
+                    break
+                parent = parent.parent
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error parsing gym leaders: {e}")
+        return []
+
+def parse_bulbapedia_row(row):
+    """
+    Parse trainer information from a Bulbapedia table row
+    """
+    try:
+        trainer_data = {
+            "location": "",
+            "trainer name": "",
+            "trainer.png": "",
+            "badge name": "",
+            "badge type": "",
+            "pokemon": []
         }
         
-    except requests.RequestException as e:
-        return {'error': f"Request failed: {e}"}
+        # Look for trainer name
+        bold_elements = row.find_all(['b', 'strong', 'big'])
+        for bold in bold_elements:
+            text = bold.get_text(strip=True)
+            if text and len(text) > 1 and not text.isdigit():
+                trainer_data["trainer name"] = text
+                break
+        
+        # Look for images (trainer sprite)
+        img = row.find('img')
+        if img and img.get('src'):
+            trainer_data["trainer.png"] = img['src']
+        
+        # Look for Pokemon information in the row
+        pokemon_links = row.find_all('a', href=re.compile(r'pokemon|pokémon', re.I))
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                # Try to extract level from surrounding text
+                level = extract_level_from_text(link.parent.get_text())
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",  # Would need Pokemon ID lookup
+                    "level": level
+                }
+                trainer_data["pokemon"].append(pokemon_data)
+        
+        # Look for badge information
+        badge_links = row.find_all('a', href=re.compile(r'badge', re.I))
+        for link in badge_links:
+            badge_name = link.get_text(strip=True)
+            if badge_name:
+                trainer_data["badge name"] = badge_name
+                break
+        
+        # Only return if we found some useful data
+        if trainer_data["trainer name"] or trainer_data["pokemon"]:
+            return trainer_data
+            
     except Exception as e:
-        return {'error': f"Scraping failed: {e}"}
+        print(f"Error parsing Bulbapedia row: {e}")
+    
+    return None
 
-def print_trainer_names(data):
-    """Print all extracted trainer names with their locations"""
-    if 'error' in data:
-        print(f"Error: {data['error']}")
-        return
+def extract_trainer_from_section(section):
+    """
+    Extract trainer information from a section element
+    """
+    try:
+        trainer_data = {
+            "location": "",
+            "trainer name": "",
+            "trainer.png": "",
+            "badge name": "",
+            "badge type": "",
+            "pokemon": []
+        }
+        
+        # Look for trainer name in the section
+        bold_elements = section.find_all(['b', 'strong', 'big'])
+        for bold in bold_elements:
+            text = bold.get_text(strip=True)
+            if text and len(text) > 1 and 'Roxie' in text:
+                trainer_data["trainer name"] = text
+                break
+        
+        # Look for images
+        img = section.find('img')
+        if img and img.get('src'):
+            trainer_data["trainer.png"] = img['src']
+        
+        # Look for Pokemon information
+        pokemon_links = section.find_all('a', href=re.compile(r'pokemon|pokémon', re.I))
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                level = extract_level_from_text(link.parent.get_text())
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",
+                    "level": level
+                }
+                trainer_data["pokemon"].append(pokemon_data)
+        
+        # Look for badge information
+        badge_links = section.find_all('a', href=re.compile(r'badge', re.I))
+        for link in badge_links:
+            badge_name = link.get_text(strip=True)
+            if badge_name:
+                trainer_data["badge name"] = badge_name
+                break
+        
+        # Only return if we found some useful data
+        if trainer_data["trainer name"] or trainer_data["pokemon"]:
+            return trainer_data
+            
+    except Exception as e:
+        print(f"Error extracting trainer from section: {e}")
     
-    print("=" * 80)
-    print(f"PAGE TITLE: {data['title']}")
-    print(f"URL: {data['url']}")
-    print(f"TOTAL TRAINERS FOUND: {data['total_trainers']}")
-    print("=" * 80)
-    print("\nTRAINER NAMES WITH LOCATIONS (Top to Bottom Order):")
-    print("-" * 80)
-    
-    # Use trainer_data if available, otherwise fall back to trainer_names
-    if 'trainer_data' in data:
-        for i, trainer_info in enumerate(data['trainer_data'], 1):
-            print(f"{i:3d}: {trainer_info['name']} - {trainer_info['location']}")
-    else:
-        for i, trainer_name in enumerate(data['trainer_names'], 1):
-            print(f"{i:3d}: {trainer_name}")
-    
-    print("-" * 80)
-    print(f"Total trainers found: {len(data['trainer_names'])}")
+    return None
 
-# Example usage
+def parse_trainer_row(row):
+    """
+    Parse trainer information from a table row
+    """
+    try:
+        cells = row.find_all(['td', 'th'])
+        if len(cells) < 2:
+            return None
+            
+        trainer_data = {
+            "location": "",
+            "trainer name": "",
+            "trainer.png": "",
+            "badge name": "",
+            "badge type": "",
+            "pokemon": []
+        }
+        
+        # Extract text from all cells
+        cell_texts = [cell.get_text(strip=True) for cell in cells]
+        
+        # Look for trainer name (usually in bold or first cell)
+        for cell in cells:
+            bold_text = cell.find('b')
+            if bold_text:
+                trainer_data["trainer name"] = bold_text.get_text(strip=True)
+                break
+        
+        # Look for images (trainer sprite)
+        img = row.find('img')
+        if img and img.get('src'):
+            trainer_data["trainer.png"] = img['src']
+        
+        # Look for Pokemon information
+        pokemon_links = row.find_all('a', href=re.compile(r'pokemon|pokémon', re.I))
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                # Try to extract level if present
+                level = extract_level_from_text(link.parent.get_text())
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",  # Would need Pokemon ID lookup
+                    "level": level
+                }
+                trainer_data["pokemon"].append(pokemon_data)
+        
+        # Only return if we found some useful data
+        if trainer_data["trainer name"] or trainer_data["pokemon"]:
+            return trainer_data
+            
+    except Exception as e:
+        print(f"Error parsing trainer row: {e}")
+    
+    return None
+
+def parse_trainer_div(div):
+    """
+    Parse trainer information from a div element
+    """
+    try:
+        trainer_data = {
+            "location": "",
+            "trainer name": "",
+            "trainer.png": "",
+            "badge name": "",
+            "badge type": "",
+            "pokemon": []
+        }
+        
+        # Look for trainer name
+        bold_elements = div.find_all(['b', 'strong'])
+        for bold in bold_elements:
+            text = bold.get_text(strip=True)
+            if text and len(text) > 1:
+                trainer_data["trainer name"] = text
+                break
+        
+        # Look for images
+        img = div.find('img')
+        if img and img.get('src'):
+            trainer_data["trainer.png"] = img['src']
+        
+        # Look for Pokemon links
+        pokemon_links = div.find_all('a', href=re.compile(r'pokemon|pokémon', re.I))
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                level = extract_level_from_text(link.parent.get_text())
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",
+                    "level": level
+                }
+                trainer_data["pokemon"].append(pokemon_data)
+        
+        # Only return if we found some useful data
+        if trainer_data["trainer name"] or trainer_data["pokemon"]:
+            return trainer_data
+            
+    except Exception as e:
+        print(f"Error parsing trainer div: {e}")
+    
+    return None
+
+def extract_level_from_text(text):
+    """
+    Extract Pokemon level from text using regex
+    """
+    level_match = re.search(r'Lv\.?\s*(\d+)', text, re.I)
+    if level_match:
+        return int(level_match.group(1))
+    return ""
+
+def save_to_json(data, filename="trainers.json"):
+    """
+    Save trainer data to JSON file
+    """
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"Data saved to {filename}")
+    except Exception as e:
+        print(f"Error saving to JSON: {e}")
+
+def parse_debug_html():
+    """
+    Parse the debug_html.html file directly to extract trainer data
+    """
+    try:
+        with open('../../debug_html.html', 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        
+        soup = BeautifulSoup(html_content, 'html.parser')
+        trainers_data = []
+        
+        # Look for Roxie (gym leader) specifically
+        roxie_data = extract_roxie_data(soup)
+        if roxie_data:
+            trainers_data.append(roxie_data)
+        
+        # Look for other trainers in the HTML
+        other_trainers = extract_other_trainers(soup)
+        trainers_data.extend(other_trainers)
+        
+        # Clean up and remove duplicates
+        cleaned_data = clean_trainer_data(trainers_data)
+        
+        return cleaned_data
+        
+    except Exception as e:
+        print(f"Error parsing debug HTML: {e}")
+        return []
+
+def clean_trainer_data(trainers_data):
+    """
+    Clean up trainer data by removing duplicates and invalid entries
+    """
+    cleaned = []
+    seen_names = set()
+    
+    for trainer in trainers_data:
+        # Skip if trainer name is empty or too generic
+        if not trainer.get("trainer name") or len(trainer.get("trainer name", "")) < 2:
+            continue
+            
+        # Skip if it's a duplicate
+        trainer_name = trainer.get("trainer name", "").strip()
+        if trainer_name in seen_names:
+            continue
+            
+        # Skip if Pokemon list contains invalid entries
+        if trainer.get("pokemon"):
+            valid_pokemon = []
+            for pokemon in trainer["pokemon"]:
+                pokemon_name = pokemon.get("name", "").strip()
+                # Skip if Pokemon name is empty, too long, or contains URLs
+                if (pokemon_name and 
+                    len(pokemon_name) < 50 and 
+                    not pokemon_name.startswith("http") and
+                    not pokemon_name.startswith("https")):
+                    valid_pokemon.append(pokemon)
+            trainer["pokemon"] = valid_pokemon
+        
+        # Only add if we have meaningful data
+        if (trainer_name and 
+            (trainer.get("pokemon") or 
+             trainer.get("trainer.png") or 
+             trainer.get("badge name"))):
+            cleaned.append(trainer)
+            seen_names.add(trainer_name)
+    
+    return cleaned
+
+def extract_roxie_data(soup):
+    """
+    Extract Roxie's data specifically
+    """
+    try:
+        trainer_data = {
+            "location": "Virbank City",
+            "trainer name": "Roxie",
+            "trainer.png": "",
+            "badge name": "Toxic Badge",
+            "badge type": "Poison",
+            "pokemon": []
+        }
+        
+        # Find Roxie's image
+        roxie_img = soup.find('img', alt=re.compile(r'Roxie', re.I))
+        if roxie_img and roxie_img.get('src'):
+            trainer_data["trainer.png"] = roxie_img['src']
+        
+        # Look for Pokemon in tables that contain Roxie's data
+        tables = soup.find_all('table')
+        for table in tables:
+            # Check if this table contains Roxie's Pokemon
+            table_text = table.get_text()
+            if 'Roxie' in table_text and any(pokemon in table_text for pokemon in ['Koffing', 'Whirlipede', 'Venipede']):
+                pokemon_data = extract_pokemon_from_table(table)
+                trainer_data["pokemon"].extend(pokemon_data)
+        
+        # If no Pokemon found in tables, look for specific Pokemon patterns
+        if not trainer_data["pokemon"]:
+            pokemon_data = extract_roxie_pokemon_directly(soup)
+            trainer_data["pokemon"] = pokemon_data
+        
+        return trainer_data
+        
+    except Exception as e:
+        print(f"Error extracting Roxie data: {e}")
+        return None
+
+def extract_roxie_pokemon_directly(soup):
+    """
+    Extract Roxie's Pokemon data directly from the HTML
+    """
+    pokemon_list = []
+    
+    try:
+        # Look for specific Pokemon mentioned in the text
+        pokemon_names = ['Koffing', 'Whirlipede', 'Venipede']
+        
+        for pokemon_name in pokemon_names:
+            # Find all mentions of this Pokemon
+            pokemon_links = soup.find_all('a', href=re.compile(pokemon_name, re.I))
+            
+            for link in pokemon_links:
+                # Get the parent element to find level information
+                parent = link.parent
+                level = extract_level_from_text(parent.get_text())
+                
+                # Only add if we found a valid level or if it's clearly a Pokemon
+                if level or pokemon_name.lower() in link.get_text().lower():
+                    pokemon_data = {
+                        "name": pokemon_name,
+                        "id": "",  # Would need Pokemon ID lookup
+                        "level": level
+                    }
+                    pokemon_list.append(pokemon_data)
+                    break  # Only add each Pokemon once
+        
+        return pokemon_list
+        
+    except Exception as e:
+        print(f"Error extracting Roxie Pokemon directly: {e}")
+        return []
+
+def extract_pokemon_from_table(table):
+    """
+    Extract Pokemon data from a table
+    """
+    pokemon_list = []
+    
+    try:
+        # Look for Pokemon links in the table
+        pokemon_links = table.find_all('a', href=re.compile(r'pokemon|pokémon', re.I))
+        
+        for link in pokemon_links:
+            pokemon_name = link.get_text(strip=True)
+            if pokemon_name and len(pokemon_name) > 1:
+                # Try to find the level in the same row or nearby
+                level = extract_level_from_text(link.parent.get_text())
+                
+                pokemon_data = {
+                    "name": pokemon_name,
+                    "id": "",  # Would need Pokemon ID lookup
+                    "level": level
+                }
+                pokemon_list.append(pokemon_data)
+        
+        return pokemon_list
+        
+    except Exception as e:
+        print(f"Error extracting Pokemon from table: {e}")
+        return []
+
+def extract_other_trainers(soup):
+    """
+    Extract other trainer data from the HTML
+    """
+    trainers = []
+    
+    try:
+        # Look for other trainer classes mentioned in the HTML
+        trainer_classes = ['Youngster', 'Worker', 'Lass', 'Roughneck', 'Guitarist']
+        
+        for trainer_class in trainer_classes:
+            # Find sections with this trainer class
+            sections = soup.find_all(string=re.compile(trainer_class, re.I))
+            
+            for section in sections:
+                parent = section.parent
+                while parent and parent.name != 'body':
+                    trainer_data = extract_trainer_from_section(parent)
+                    if trainer_data:
+                        trainers.append(trainer_data)
+                        break
+                    parent = parent.parent
+        
+        return trainers
+        
+    except Exception as e:
+        print(f"Error extracting other trainers: {e}")
+        return []
+
 if __name__ == "__main__":
-    # Default URL
-    url = "https://bulbapedia.bulbagarden.net/wiki/Walkthrough:Pok%C3%A9mon_Black_2_and_White_2/Part_3"
+    url = "https://pokemondb.net/black-white/gymleaders-elitefour#gym-1"
+    if len(sys.argv) > 1:
+        url = sys.argv[1]
     
-    # You can change the URL here or pass it as a parameter
-    # url = "https://example.com"  # Replace with your desired URL
+    print(f"Scraping data from: {url}")
+    trainers_data = scrape_trainers(url)
     
-    print("Scraping webpage...")
-    
-    # Get content with font information
-    data = scrape_page_content(url)
-    
-    # Get complete HTML content
-    html_data = scrape_full_html(url)
-    
-    # Extract trainer names
-    trainer_data = extract_trainer_names(url)
-    
-    # Print trainer names first
-    print("\n" + "="*80)
-    print("OPTION 1: Trainer Names Extraction")
-    print("="*80)
-    print_trainer_names(trainer_data)
-
-
-
-
+    if trainers_data:
+        print(f"Found {len(trainers_data)} trainers")
+        save_to_json(trainers_data)
+        
+        # Print first trainer as example
+        if trainers_data:
+            print("\nFirst trainer data:")
+            print(json.dumps(trainers_data[0], indent=2))
+    else:
+        print("No trainer data found. The HTML structure might be different than expected.")
+        print("You may need to inspect the HTML manually to find the correct selectors.")
