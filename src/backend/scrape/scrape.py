@@ -136,15 +136,18 @@ def extract_trainer_from_card(card):
             "pokemon": []
         }
         
-        # Extract trainer name from <span class="ent-name">
+        # Extract a from <span class="ent-name">
         trainer_name_span = card.find('span', class_='ent-name')
         if trainer_name_span:
+            if trainer_name_span.contents[0].lower().__contains__("rematch"):
+                return None
+
             trainer_data["trainer_name"] = trainer_name_span.get_text(strip=True)
         
         # Extract trainer image from <img class="img-fixed img-trainer-v#">
         trainer_img = card.find('img', class_=re.compile(r'img-fixed img-trainer-v\d+'))
         if trainer_img and trainer_img.get('src'):
-            trainer_data["trainer_png"] = trainer_img['src']
+            trainer_data["trainer_image"] = trainer_img['src']
         
         # Extract badge type from <span class="itype {type}">
         type_spans = card.find_all('span', class_=re.compile(r'itype'))
@@ -256,31 +259,25 @@ def save_to_json(data, game_name):
     Save trainer data to JSON file
     """
     try:
-        filename = f"trainer_data/{game_name}_trainers.json"
+        filename =  f"trainer_data/{game_name}_trainers.json"
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         print(f"Data saved to {filename}")
     except Exception as e:
         print(f"Error saving to JSON: {e}")
 
-if __name__ == "__main__":
-    url = "https://pokemondb.net/red-blue/gymleaders-elitefour"
-    if len(sys.argv) > 1:
-        url = sys.argv[1]
 
-    game_name = url.split("/")[-2]
+
+if __name__ == "__main__":
+
+    urls = ["https://pokemondb.net/red-blue/gymleaders-elitefour", "https://pokemondb.net/yellow/gymleaders-elitefour", "https://pokemondb.net/firered-leafgreen/gymleaders-elitefour", "https://pokemondb.net/ruby-sapphire/gymleaders-elitefour",
+    "https://pokemondb.net/gold-silver/gymleaders-elitefour", "https://pokemondb.net/crystal/gymleaders-elitefour", "https://pokemondb.net/heartgold-soulsilver/gymleaders-elitefour","https://pokemondb.net/diamond-pearl/gymleaders-elitefour", "https://pokemondb.net/platinum/gymleaders-elitefour", "https://pokemondb.net/heartgold-soulsilver/gymleaders-elitefour",
+    "https://pokemondb.net/black-white/gymleaders-elitefour","https://pokemondb.net/black-white-2/gymleaders-elitefour"]    
     
-    print(f"Scraping data from: {url}")
-    trainers_data = scrape_trainers(url)
-    
-    if trainers_data:
-        print(f"Found {len(trainers_data)} trainers")
+
+    for url in urls:
+        game_name = url.split("/")[-2]
+        print(f"Scraping data from: {url}")
+        trainers_data = scrape_trainers(url)
         save_to_json(trainers_data, game_name)
-        
-        # Print first trainer as example
-        if trainers_data:
-            print("\nFirst trainer data:")
-            print(json.dumps(trainers_data[0], indent=2))
-    else:
-        print("No trainer data found. The HTML structure might be different than expected.")
 
