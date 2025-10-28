@@ -3,6 +3,10 @@ from bs4 import BeautifulSoup
 import json
 import sys
 import re
+"""
+run program in directory
+"""
+
 
 def scrape_trainers(url):
     """
@@ -28,6 +32,21 @@ def scrape_trainers(url):
             
             # Extract location from the header text
             location = section.get_text(strip=True)
+            loc = ""
+            gym_number = ""
+            if(location.startswith("Gym #")):
+                loc = location.split(",")[1].strip()
+                print(loc)
+                gym_number = location.split(",")[0].split("#")[1].strip()
+                print(gym_number)
+            elif(location.startswith("Elite Four")):
+                loc = location.split("#")[0].strip()
+                gym_number = location.split("#")[1].strip()
+                
+            elif(location.startswith("Champion")):
+                loc = location
+                gym_number = ""
+
             
             # Find trainer cards within this section
             # Look for trainer cards that come after this h2 element
@@ -44,7 +63,8 @@ def scrape_trainers(url):
                 for card in trainer_cards:
                     trainer_data = extract_trainer_from_card(card)
                     if trainer_data:
-                        trainer_data["location"] = location
+                        trainer_data["location"] = loc
+                        trainer_data["gym_number"] = gym_number
                         section_trainers.append(trainer_data)
                 
                 current = current.find_next_sibling()
@@ -128,6 +148,7 @@ def extract_trainer_from_card(card):
     """
     try:
         trainer_data = {
+            "gym_number": "",
             "location": "",
             "trainer_name": "",
             "trainer_image": "",
@@ -139,6 +160,7 @@ def extract_trainer_from_card(card):
         # Extract a from <span class="ent-name">
         trainer_name_span = card.find('span', class_='ent-name')
         if trainer_name_span:
+            # rematch trainers not included
             if trainer_name_span.contents[0].lower().__contains__("rematch"):
                 return None
 
@@ -225,6 +247,9 @@ def extract_pokemon_from_pokemon_card(pokemon_card):
             if id_match:
                 pokemon_id = id_match.group(1)
         
+        if(pokemon_id != ""):
+            pokemon_id = int(pokemon_id)
+
         # Extract level from second <small> element (Level X)
         level = ""
         if len(small_elements) >= 2:
@@ -233,6 +258,9 @@ def extract_pokemon_from_pokemon_card(pokemon_card):
             if level_match:
                 level = level_match.group(1)
         
+
+        if(level != ""):
+            level = int(level)
         pokemon_data = {
             "name": pokemon_name,
             "id": pokemon_id,
