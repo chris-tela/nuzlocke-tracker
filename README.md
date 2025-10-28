@@ -36,7 +36,7 @@ It provides an interactive way to **plan, record, and review** each run while ma
 | **Language** | Python |
 | **Web Scraping / Data Aggregation** | BeautifulSoup, PokeAPI |
 | **Database** | PostgreSQL |
-| **Architecture** | CLI-based backend ready for web and mobile extension |
+| **Architecture** | CLI-based backend as a simulation of app's core logic |
 
 ---
 
