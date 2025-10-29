@@ -267,6 +267,51 @@ def print_comparison_results(results: dict):
     print(f"Requests times: {[f'{t:.4f}' for t in results['requests_times']]}")
     print("="*50)
 
+def evolution_parse(index):
+ # format of 'chain' in pokemon_attributes:
+    # "evolution_data": 
+    # [
+    #     {
+    #         "evolves_to": {
+    #             "species": "vaporeon", 
+    #             "evolution_details": [{"min_level": 16}, {"trigger": {"name": "level-up"}}]
+    #         }
+    #     }
+    # ]
+    pokemon_species = requests.get(f"https://pokeapi.co/api/v2/pokemon-species/{index}").json()
+    chain_id = pokemon_species["evolution_chain"]["url"].split("/")[-2]
+    chain = requests.get(f"https://pokeapi.co/api/v2/evolution-chain/{chain_id}/").json()
+    data = {"name": pokemon_species["name"], "evolution_data": []}
+
+    print(2)
+    try:
+        if(len(chain["chain"]["evolves_to"]) > 0):
+            # stage 1 --> stage 2
+            if(str(chain["chain"]["species"]["name"]) == str(data["name"])):
+                for evo in chain["chain"]["evolves_to"]:
+                    data["evolution_data"].append({
+                        "evolves_to": {
+                            "species": evo["species"]["name"],
+                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"]}, {"trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
+                        }
+                    })
+        # stage 2 --> stage 3
+            if(str(chain["chain"]["evolves_to"][0]["species"]["name"]) == str(data["name"])):
+                for evo in chain["chain"]["evolves_to"][0]["evolves_to"]:
+                    data["evolution_data"].append({
+                        "evolves_to": {
+                            "species": evo["species"]["name"],
+                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"]}, {"trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
+                        }
+                    })
+    except Exception as e:
+        print(e)
+
+    # pretty print json data
+    json_formatted_str = json.dumps(data, indent=2)
+    print(json_formatted_str)
+
+    return data
 
 
-get_pokemon_encounters("mewtwo")
+evolution_parse(1)

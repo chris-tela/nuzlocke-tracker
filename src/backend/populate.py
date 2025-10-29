@@ -4,6 +4,7 @@ File is used to populate database with data from the PokeAPI.
 
 import requests
 import os
+import json
 from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -24,6 +25,7 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
     index = 1
     while True:
         response = requests.get(f"https://pokeapi.co/api/v2/pokemon/{index}")
+
         if response.status_code == 200:
             try:
                 pokemon = response.json()
@@ -41,6 +43,14 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
                 base_speed = stats[5]["base_stat"]
                 sprite = pokemon["sprites"]["front_default"]
                 created_at = datetime.now()
+
+                # evolution logic
+                pokemon_species = requests.get(f"https://pokeapi.co/api/v2/pokemon-species/{index}").json()
+                chain_id = pokemon_species["evolution_chain"]["url"].split("/")[-2]
+                chain = requests.get(f"https://pokeapi.co/api/v2/evolution-chain/{chain_id}/").json()
+                evolution_data = evolution_parse(chain, name)
+                
+
             except Exception as e:
                 print(f"Error at {index}: {e}")
         else:
@@ -61,6 +71,7 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
             base_special_attack = base_special_attack,
             base_special_defense = base_special_defense,
             base_speed = base_speed,
+            evolution_data = evolution_data,
             sprite = sprite,
             created_at = created_at
         )
@@ -70,6 +81,49 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
     db.close()
 
     return {"message": "Pokemon populated successfully"}
+
+def evolution_parse(chain: str, name: str):
+ # format of 'chain' in pokemon_attributes:
+    # "evolution_data": 
+    # [
+    #     {
+    #         "evolves_to": {
+    #             "species": "vaporeon", 
+    #             "evolution_details": [{"min_level": 16}, {"trigger": {"name": "level-up"}}]
+    #         }
+    #     }
+    # ]
+    data = {"name": name, "evolution_data": []}
+
+    try:
+        if(len(chain["chain"]["evolves_to"]) > 0):
+            # stage 1 --> stage 2
+            if(str(chain["chain"]["species"]["name"]) == str(data["name"])):
+                for evo in chain["chain"]["evolves_to"]:
+                    data["evolution_data"].append({
+                        "evolves_to": {
+                            "species": evo["species"]["name"],
+                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"]}, {"trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
+                        }
+                    })
+        # stage 2 --> stage 3
+            if(str(chain["chain"]["evolves_to"][0]["species"]["name"]) == str(data["name"])):
+                for evo in chain["chain"]["evolves_to"][0]["evolves_to"]:
+                    data["evolution_data"].append({
+                        "evolves_to": {
+                            "species": evo["species"]["name"],
+                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"]}, {"trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
+                        }
+                    })
+    except Exception as e:
+        print(e)
+
+    # pretty print json data
+    json_formatted_str = json.dumps(data, indent=2)
+    print(json_formatted_str)
+
+    return data
+
 
 # initalize all versions in the database
 @app.post("/populate/generation/{generation_id}")
