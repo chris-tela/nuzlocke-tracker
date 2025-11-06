@@ -74,7 +74,7 @@ def starter(game: str):
                     abilities = starter_data.abilities
                     sprite = starter_data.sprite
                 
-                evolution_data =
+                evolution_data = x
 
 
 
