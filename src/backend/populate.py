@@ -87,7 +87,7 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
 
     return {"message": "Pokemon populated successfully"}
 
-def evolution_parse(chain: str, name: str):
+def evolution_parse(chain: dict, name: str):
  # format of 'chain' in pokemon_attributes:
     # "evolution_data": 
     # [
@@ -200,7 +200,7 @@ def populate_versions(generation_id: int, db: Session = Depends(database.get_db)
             version_ids.append(vers_id)
         try:
             string = version_group_name.replace("-","_").upper() + "_locations_ordered".upper()
-            locations_ordered = utils.get_region_locations_ordered(string, gen.region_name)
+            locations_ordered = utils.get_region_locations_ordered(string, str(gen.region_name))
         except Exception as e:
 
             continue
@@ -234,7 +234,7 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
     for loc in version.locations_ordered:
         try:
             loc_lower = loc.lower()
-            data = utils.get_encounters(loc_lower, generation.region_name, version.version_name)
+            data = utils.get_encounters(loc_lower, str(generation.region_name), str(version.version_name))
         except Exception as e:
             continue
         try:
