@@ -73,11 +73,7 @@ def starter(game: str):
                     types = starter_data.types
                     abilities = starter_data.abilities
                     sprite = starter_data.sprite
-                
-                evolution_data = x
-
-
-
+                    evolution_data = starter_data.evolution_data
 
                 return starters
         print("error :(")

@@ -45,14 +45,19 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
                 created_at = datetime.now()
 
                 # evolution logic
-                pokemon_species = requests.get(f"https://pokeapi.co/api/v2/pokemon-species/{index}").json()
-                chain_id = pokemon_species["evolution_chain"]["url"].split("/")[-2]
-                chain = requests.get(f"https://pokeapi.co/api/v2/evolution-chain/{chain_id}/").json()
-                evolution_data = evolution_parse(chain, name)
-                
+                evolution_data = []  # Initialize empty array
+                try:
+                    pokemon_species = requests.get(f"https://pokeapi.co/api/v2/pokemon-species/{index}").json()
+                    chain_id = pokemon_species["evolution_chain"]["url"].split("/")[-2]
+                    chain = requests.get(f"https://pokeapi.co/api/v2/evolution-chain/{chain_id}/").json()
+                    evolution_result = evolution_parse(chain, name)
+                    evolution_data = evolution_result.get("evolution_data", [])  # Extract just the array
+                except Exception as evo_error:
+                    print(f"Evolution parsing error at {index}: {evo_error}")
 
             except Exception as e:
                 print(f"Error at {index}: {e}")
+                continue  # Skip to next iteration if main pokemon data fails
         else:
             break
 
