@@ -4,31 +4,37 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime
+import json
 from db import database
 from db import models
 from sqlalchemy.orm import Session
-from typing import cast
-from fastapi import Depends
+from typing import cast, Optional
 
+trainer_data = []
+
+route_progression = []
+gym_progression = []
 
 def main():
 
     print("Welcome to the Pokemon CLI!")
     print("What game are you playing?")
 
-    selected_game = game()
+    selected_game = game_choice()
 
     print(f"You are playing {selected_game} Version")
     print("What is your trainer name?")
     trainer_name = input()
     print(f"Welcome, {trainer_name}! Let's get started.")
     print("What is your starter pokemon?")
+    trainer_data.append(selected_game)
+    trainer_data.append(trainer_name)
     starter(selected_game)
 
 
 
 
-def game() -> str:
+def game_choice() -> str:
     while True:
         game = input()
 
@@ -47,7 +53,7 @@ def game() -> str:
                 print("Invalid game")
     return game
 
-def starter(game: str, db: Session = Depends(database.get_db)):
+def starter(game: str):
     db = database.SessionLocal()
     try:
         version = db.query(models.Version).filter(models.Version.version_name == game).first()
@@ -75,18 +81,223 @@ def starter(game: str, db: Session = Depends(database.get_db)):
 
                 if starter_data:
                     added_pokemon = add_to_party(starter_data)
-                    add_to_party_database(added_pokemon, db)
+                    add_to_party_database(added_pokemon)
 
+                save_to_storage()
+                return
 
-
-                return starters
         print("error :(")
+    finally:
+        db.close()
+
+# main gameplay
+def game():
+    while True:
+        print("------------------------")
+        print("Select '1' to view & update team")
+        print("Select '2' to view & update upcoming routes/encounter locations")
+        print("Select '3' to view & update upcoming gym locations")
+        print("Select '4' to save data and exit!")
+        print("------------------------")
+
+        selection = input().lower()
+        if(selection == "1"):
+            team()
+        if(selection == "4"):
+            continue
+        
+        
+
+def team():
+
+
+    db = database.SessionLocal()
+
+    print("Team Status:")
+    party_pokemon_list = db.query(models.PartyPokemon).all()
+
+
+    if party_pokemon_list:
+        for pokemon in party_pokemon_list:
+            print("Pokemon: " + pokemon.name)
+            print("Nickname: " + pokemon.nickname)
+            print("Level: " + pokemon.level)
+            print("Type(s): " + str(pokemon.types))
+            print("-----------\n")
+
+        print("Would you like to edit any information of a pokemon?: (y = yes)")
+        edit = input().lower()
+        if(edit == "y"):
+            edit_pokemon(party_pokemon_list, db)
+    else:
+        print("Team is empty!")
+
+
+
+def edit_pokemon(party_pokemon_list, db):
+    print("Which pokemon would you like to edit? ")
+    poke_name = input().lower()
+    pokemon_names = [pokemon.name.lower() for pokemon in party_pokemon_list]
+
+    if(poke_name in pokemon_names):
+        poke_data = db.query(models.PartyPokemon).filter(models.PartyPokemon.name == poke_name).first()
+        
+        print("Would you like to: ")
+        print("1: Change Level: ")
+        print("2: Edit name: ")
+        choice = input().lower()
+        if(choice == "1"):
+            print("Current level is: " + poke_data.level)
+            print("What level would you like to be?: ")
+            level = int(input().lower())
+            if(level <= 100 and level >= 1):
+                # db update pokemon level
+                poke_data.level = level
+
+                if(poke_data.level >= poke_data.evolution_data[0]["evolves_to"]["evolution_details"]["min_level"]):
+                    print("Would you like to evolve your pokemon?")
+                    choice = input().lower()
+                    if(choice == "y"):
+                        evolved_pokemon_name = poke_data.evolution_data[0]["evolves_to"]["species"]
+                        evolved_pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == evolved_pokemon_name).first()
+                        if evolved_pokemon_data:
+                            evolve(poke_data, evolved_pokemon_data, db)
+
+                else:
+                    db.commit()
+                print(f"Pokemon level updated to {level}!")
+            else:
+                print("Invalid level. Level must be between 1 and 100.")
+             
+
+
+'''
+gamefile (what do we wanna know):
+    - trainer name, game name
+    - party pokemon (including their level nickname stats etc)
+    - gym progression
+    - route progression
+
+    gamefile:
+        "trainer_data": 
+        {
+            "trainer_name": trainer_name,
+            "game_name": selected_game
+        },
+        "party_pokemon": 
+        [
+            {
+                model.PartyPokemon
+            }
+        ],
+        "gym_progression":
+        {
+            "gym_1": true,  # or false if not passed
+            "gym_2": true,
+            ...
+        },
+        "route_progression": 
+        [
+            {
+                "route": "route_1",
+                "caught": true,
+                "pokemon_name": "pikachu"
+            },
+            {
+                "route": "route_2", 
+                "caught": false,
+                "pokemon_name": null
+            }
+        ]
+            ...
+        }
+        
+'''
+def save_to_storage():
+    """
+    Save game progress to storage.json in the format specified above.
+    Gets party pokemon from DB and formats all data according to the JSON structure.
+    """
+    db = database.SessionLocal()
+    try:
+        # Get all party pokemon from database
+        party_pokemon_list = db.query(models.PartyPokemon).all()
+        
+        # Convert party pokemon to dictionary format with all fields
+        party_pokemon_json = []
+        for pokemon in party_pokemon_list:
+            # Handle datetime serialization
+            created_at_str = None
+            if pokemon.created_at is not None:
+                if isinstance(pokemon.created_at, datetime):
+                    created_at_str = pokemon.created_at.isoformat()
+                else:
+                    created_at_str = str(pokemon.created_at)
+            
+            pokemon_dict = {
+                "id": pokemon.id,
+                "poke_id": pokemon.poke_id,
+                "name": pokemon.name,
+                "nickname": pokemon.nickname,
+                "nature": pokemon.nature,
+                "ability": pokemon.ability,
+                "types": pokemon.types,
+                "level": pokemon.level,
+                "gender": pokemon.gender,
+                "evolution_data": pokemon.evolution_data,
+                "sprite": pokemon.sprite,
+                "created_at": created_at_str
+            }
+            party_pokemon_json.append(pokemon_dict)
+        
+        # Format trainer_data from global variable or use defaults
+        trainer_name = trainer_data[1] if len(trainer_data) > 1 else ""
+        game_name = trainer_data[0] if len(trainer_data) > 0 else ""
+        
+        trainer_data_json = {
+            "trainer_name": trainer_name,
+            "game_name": game_name
+        }
+        
+        # Format gym_progression - convert list to dict if needed, or use as-is
+        gym_progression_json = {}
+        if isinstance(gym_progression, list):
+            # If it's a list, convert to dict format
+            for i, passed in enumerate(gym_progression, 1):
+                gym_progression_json[f"gym_{i}"] = passed
+        elif isinstance(gym_progression, dict):
+            gym_progression_json = gym_progression
+        else:
+            # Default empty dict
+            gym_progression_json = {}
+        
+        # Format route_progression - use the array format as specified
+        route_progression_json = route_progression if isinstance(route_progression, list) else []
+        
+        # Build the complete gamefile structure
+        gamefile = {
+            "trainer_data": trainer_data_json,
+            "party_pokemon": party_pokemon_json,
+            "gym_progression": gym_progression_json,
+            "route_progression": route_progression_json
+        }
+        
+        # Save to storage.json
+        storage_path = os.path.join(os.path.dirname(__file__), "storage.json")
+        with open(storage_path, 'w', encoding='utf-8') as f:
+            json.dump(gamefile, f, indent=2, ensure_ascii=False)
+        
+        print(f"Game data saved to {storage_path}")
+        return gamefile
+        
+    except Exception as e:
+        print(f"Error saving to storage: {e}")
+        raise
     finally:
         db.close()
 
 
 def add_to_party(pokemon_data):
-
     if pokemon_data: 
         poke_id = pokemon_data.poke_id
         name = pokemon_data.name
@@ -138,11 +349,56 @@ def add_to_party(pokemon_data):
 
     return added_pokemon
 
-def add_to_party_database(added_pokemon, db: Session = Depends(database.get_db)):
-    db.add(added_pokemon)
+# replace pokemon with it's evolved form
+def evolve(old_pokemon, new_pokemon, db):
+    """
+    Evolve a pokemon to its evolved form.
+    Keeps: nickname, nature, level, gender, created_at (automatically preserved)
+    Updates: poke_id, name, types, sprite, evolution_data, ability (user selects)
+    """
+    # Update from new pokemon data
+    old_pokemon.poke_id = new_pokemon.poke_id
+    old_pokemon.name = new_pokemon.name
+    old_pokemon.types = new_pokemon.types
+    old_pokemon.sprite = new_pokemon.sprite
+    old_pokemon.evolution_data = new_pokemon.evolution_data
+    
+    # Ask user to select new ability
+    print(f"Your pokemon can have these abilities:")
+    print(new_pokemon.abilities)
+    print("Which ability would you like?")
+    while True:
+        ability_input = input().lower()
+        # Find the matching ability with original casing
+        matching_ability = None
+        for ab in new_pokemon.abilities:
+            if ab.lower() == ability_input:
+                matching_ability = ab
+                break
+        if matching_ability:
+            old_pokemon.ability = matching_ability
+            break
+        else:
+            print("Invalid ability. Please choose from the list above.")
+    
+    # Commit changes to database
     db.commit()
-    db.close()
-    print("added to party!")
+    print(f"Congratulations! Your pokemon evolved into {old_pokemon.name}!")
+    
+
+def add_to_party_database(added_pokemon):
+    db = database.SessionLocal()
+    try:
+        db.add(added_pokemon)
+        db.commit()
+        print("added to party!")
+    except Exception as e:
+        db.rollback()
+        print(f"Error adding pokemon to database: {e}")
+        raise
+    finally:
+        db.close()
+
 
 
 if __name__ == "__main__":

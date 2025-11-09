@@ -1,15 +1,43 @@
-from sqlalchemy import Column, Integer, String, Boolean, ARRAY, JSON
+from sqlalchemy import Column, Integer, String, Boolean, ARRAY, JSON, Enum
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.sqltypes import TIMESTAMP
 from sqlalchemy.sql.expression import text
 from .database import Base
 
+class Nature(Enum):
+    HARDY = "Hardy"
+    LONELY = "Lonely"
+    BRAVE = "Brave"
+    ADAMANT = "Adamant"
+    NAUGHTY = "Naughty"
+    BOLD = "Bold"
+    DOCILE = "Docile"
+    RELAXED = "Relaxed"
+    IMPISH = "Impish"
+    LAX = "Lax"
+    TIMID = "Timid"
+    HASTY = "Hasty"
+    SERIOUS = "Serious"
+    JOLLY = "Jolly"
+    NAIVE = "Naive"
+    MODEST = "Modest"
+    MILD = "Mild"
+    QUIET = "Quiet"
+    BASHFUL = "Bashful"
+    RASH = "Rash"
+    CALM = "Calm"
+    GENTLE = "Gentle"
+    SASSY = "Sassy"
+    CAREFUL = "Careful"
+    QUIRKY = "Quirky"    
+
 class AllPokemon(Base):
     __tablename__ = "all_pokemon"
 
-    id = Column(Integer, nullable=False, autoincrement=True)
-    poke_id = Column(Integer, primary_key=True, nullable=False)
+    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
+    # poke_id cant be pkey because you can have multiple of the same pokemon on the same team
+    poke_id = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
     types = Column(ARRAY(String), nullable=False)
     abilities = Column(ARRAY(String), nullable=False)
