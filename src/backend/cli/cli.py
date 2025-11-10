@@ -32,6 +32,8 @@ def main():
     starter(selected_game)
 
 
+    game()
+
 
 
 def game_choice() -> str:
@@ -103,8 +105,10 @@ def game():
         selection = input().lower()
         if(selection == "1"):
             team()
+        if(selection == "2"):
+            encounters()
         if(selection == "4"):
-            continue
+            save_to_storage()
         
         
 
@@ -121,7 +125,7 @@ def team():
         for pokemon in party_pokemon_list:
             print("Pokemon: " + pokemon.name)
             print("Nickname: " + pokemon.nickname)
-            print("Level: " + pokemon.level)
+            print("Level: " + str(pokemon.level))
             print("Type(s): " + str(pokemon.types))
             print("-----------\n")
 
@@ -135,84 +139,222 @@ def team():
 
 
 def edit_pokemon(party_pokemon_list, db):
-    print("Which pokemon would you like to edit? ")
-    poke_name = input().lower()
-    pokemon_names = [pokemon.name.lower() for pokemon in party_pokemon_list]
+    print("Which pokemon would you like to edit?: ")
 
-    if(poke_name in pokemon_names):
-        poke_data = db.query(models.PartyPokemon).filter(models.PartyPokemon.name == poke_name).first()
+    party_pokemon = db.query(models.PartyPokemon).all()
+    i = 1
+    for pokemon in party_pokemon:
+        print(str(i) + ": " + pokemon.name)
+        i += 1 
+    
+
+    choice = int(input().lower())
+    poke_data = party_pokemon[choice - 1] 
         
-        print("Would you like to: ")
-        print("1: Change Level: ")
-        print("2: Edit name: ")
-        choice = input().lower()
-        if(choice == "1"):
-            print("Current level is: " + poke_data.level)
-            print("What level would you like to be?: ")
-            level = int(input().lower())
-            if(level <= 100 and level >= 1):
-                # db update pokemon level
-                poke_data.level = level
+    print("Would you like to: ")
+    print("1: Change Level: ")
+    print("2: Edit name: ")
+    choice = input().lower()
+    if(choice == "1"):
+        print("Current level is: " + str(poke_data.level))
+        print("What level would you like to be?: ")
+        level = int(input().lower())
+        if(level <= 100 and level >= 1):
+            # db update pokemon level
+            poke_data.level = level
 
-                if(poke_data.level >= poke_data.evolution_data[0]["evolves_to"]["evolution_details"]["min_level"]):
-                    print("Would you like to evolve your pokemon?")
-                    choice = input().lower()
-                    if(choice == "y"):
-                        evolved_pokemon_name = poke_data.evolution_data[0]["evolves_to"]["species"]
-                        evolved_pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == evolved_pokemon_name).first()
-                        if evolved_pokemon_data:
-                            evolve(poke_data, evolved_pokemon_data, db)
+            if(poke_data.level >= int(poke_data.evolution_data[0]["evolves_to"]["evolution_details"][0]["min_level"])):
+                print("Would you like to evolve your pokemon?")
+                choice = input().lower()
+                if(choice == "y"):
+                    evolved_pokemon_name = poke_data.evolution_data[0]["evolves_to"]["species"]
+                    evolved_pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == evolved_pokemon_name).first()
+                    if evolved_pokemon_data:
+                        evolve(poke_data, evolved_pokemon_data, db)
 
-                else:
-                    db.commit()
-                print(f"Pokemon level updated to {level}!")
             else:
-                print("Invalid level. Level must be between 1 and 100.")
-             
+                db.commit()
+            print(f"Pokemon level updated to {level}!")
+        else:
+            print("Invalid level. Level must be between 1 and 100.")
+# replace pokemon with it's evolved form
+def evolve(old_pokemon, new_pokemon, db):
+    """
+    Evolve a pokemon to its evolved form.
+    Keeps: nickname, nature, level, gender, created_at (automatically preserved)
+    Updates: poke_id, name, types, sprite, evolution_data, ability (user selects)
+    """
+    # Update from new pokemon data
+    old_pokemon.poke_id = new_pokemon.poke_id
+    old_pokemon.name = new_pokemon.name
+    old_pokemon.types = new_pokemon.types
+    old_pokemon.sprite = new_pokemon.sprite
+    old_pokemon.evolution_data = new_pokemon.evolution_data
+    
+    # Ask user to select new ability
+    print(f"Your pokemon can have these abilities:")
+    print(new_pokemon.abilities)
+    print("Which ability would you like?")
+    while True:
+        ability_input = input().lower()
+        # Find the matching ability with original casing
+        matching_ability = None
+        for ab in new_pokemon.abilities:
+            if ab.lower() == ability_input:
+                matching_ability = ab
+                break
+        if matching_ability:
+            old_pokemon.ability = matching_ability
+            break
+        else:
+            print("Invalid ability. Please choose from the list above.")
+    
+    # Commit changes to database
+    db.commit()
+    print(f"Congratulations! Your pokemon evolved into {old_pokemon.name}!")
+    
+def encounters():
+    """
+    Display routes/encounters for the current game and allow user to update route progression.
+    Reads game name from storage.json to query routes from database.
+    """
+    # Read storage.json to get game name
+    storage_path = os.path.join(os.path.dirname(__file__), "storage.json")
+    game_name = ""
+    
+    try:
+        with open(storage_path, 'r', encoding='utf-8') as f:
+            storage_data = json.load(f)
+            game_name = storage_data.get("trainer_data", {}).get("game_name", "")
+    except FileNotFoundError:
+        print("Storage file not found. Using trainer_data global variable.")
+        if len(trainer_data) > 0:
+            game_name = trainer_data[0]
+    
+    if not game_name:
+        print("No game name found. Please start a new game first.")
+        return
+    
+    db = database.SessionLocal()
+    try:
+        # Query version by game name
+        version = db.query(models.Version).filter(models.Version.version_name == game_name).first()
+        if not version:
+            print(f"Version '{game_name}' not found in database.")
+            return
+        
+        # Get all routes for this version
+        routes = db.query(models.Route).filter(models.Route.version_id == version.version_id).all()
+        
+        if not routes:
+            print(f"No routes found for {game_name}.")
+            return
+        
+        print(f"\n=== Routes and Encounters for {game_name} ===\n")
+        
+        # Display routes and their encounters
+        for i, route in enumerate(routes, 1):
+            print(f"{i}. {route.name}")
+            print(f"   Encounters:")
+            
+            # Route.data contains encounter data: [name, min_level, max_level, version_name, region_name, encounter_method]
+            if route.data:
+                for encounter in route.data:
+                    pokemon_name = encounter[0] if len(encounter) > 0 else "Unknown"
+                    min_level = encounter[1] if len(encounter) > 1 else "?"
+                    max_level = encounter[2] if len(encounter) > 2 else "?"
+                    methods = encounter[5] if len(encounter) > 5 else []
+                    methods_str = ", ".join(methods) if methods else "walk"
+                    print(f"      - {pokemon_name} (Lv. {min_level}-{max_level}) [{methods_str}]")
+            print()
+        
+        # Allow user to update route progression
+        print("Would you like to update route progression? (y = yes)")
+        update_choice = input().lower()
+        if update_choice == "y":
+            print("Which route would you like to update? (Enter route number)")
+            try:
+                route_choice = int(input())
+                if 1 <= route_choice <= len(routes):
+                    selected_route = routes[route_choice - 1]
+                    update_route_progression(selected_route, db)
+                else:
+                    print("Invalid route number.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+                
+    except Exception as e:
+        print(f"Error loading encounters: {e}")
+        raise
+    finally:
+        db.close()
 
-
-'''
-gamefile (what do we wanna know):
-    - trainer name, game name
-    - party pokemon (including their level nickname stats etc)
-    - gym progression
-    - route progression
-
-    gamefile:
-        "trainer_data": 
-        {
-            "trainer_name": trainer_name,
-            "game_name": selected_game
-        },
-        "party_pokemon": 
-        [
-            {
-                model.PartyPokemon
-            }
-        ],
-        "gym_progression":
-        {
-            "gym_1": true,  # or false if not passed
-            "gym_2": true,
-            ...
-        },
-        "route_progression": 
-        [
-            {
-                "route": "route_1",
-                "caught": true,
-                "pokemon_name": "pikachu"
-            },
-            {
-                "route": "route_2", 
-                "caught": false,
-                "pokemon_name": null
-            }
-        ]
-            ...
+def update_route_progression(route, db):
+    """
+    Update route progression - mark route as caught and record which pokemon was caught.
+    """
+    print(f"\nUpdating progression for {route.name}")
+    print("Have you caught a pokemon on this route? (y = yes)")
+    caught_choice = input().lower()
+    
+    if caught_choice == "y":
+        # Show available pokemon for this route
+        if route.data:
+            print("Which pokemon did you catch?")
+            pokemon_list = [encounter[0] for encounter in route.data if len(encounter) > 0]
+            for i, pokemon in enumerate(pokemon_list, 1):
+                print(f"  {i}. {pokemon}")
+            
+            try:
+                pokemon_choice = int(input())
+                if 1 <= pokemon_choice <= len(pokemon_list):
+                    caught_pokemon = pokemon_list[pokemon_choice - 1]
+                    
+                    # Update route_progression global variable
+                    route_entry = {
+                        "route": route.name,
+                        "caught": True,
+                        "pokemon_name": caught_pokemon
+                    }
+                    
+                    # Check if route already exists in route_progression
+                    route_exists = False
+                    for i, existing_route in enumerate(route_progression):
+                        if existing_route.get("route") == route.name:
+                            route_progression[i] = route_entry
+                            route_exists = True
+                            break
+                    
+                    if not route_exists:
+                        route_progression.append(route_entry)
+                    
+                    print(f"Route progression updated: {route.name} - Caught {caught_pokemon}")
+                else:
+                    print("Invalid pokemon choice.")
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+        else:
+            print("No encounter data available for this route.")
+    else:
+        # Mark route as not caught
+        route_entry = {
+            "route": route.name,
+            "caught": False,
+            "pokemon_name": None
         }
         
-'''
+        # Check if route already exists in route_progression
+        route_exists = False
+        for i, existing_route in enumerate(route_progression):
+            if existing_route.get("route") == route.name:
+                route_progression[i] = route_entry
+                route_exists = True
+                break
+        
+        if not route_exists:
+            route_progression.append(route_entry)
+        
+        print(f"Route progression updated: {route.name} - Not caught")
 def save_to_storage():
     """
     Save game progress to storage.json in the format specified above.
@@ -349,42 +491,7 @@ def add_to_party(pokemon_data):
 
     return added_pokemon
 
-# replace pokemon with it's evolved form
-def evolve(old_pokemon, new_pokemon, db):
-    """
-    Evolve a pokemon to its evolved form.
-    Keeps: nickname, nature, level, gender, created_at (automatically preserved)
-    Updates: poke_id, name, types, sprite, evolution_data, ability (user selects)
-    """
-    # Update from new pokemon data
-    old_pokemon.poke_id = new_pokemon.poke_id
-    old_pokemon.name = new_pokemon.name
-    old_pokemon.types = new_pokemon.types
-    old_pokemon.sprite = new_pokemon.sprite
-    old_pokemon.evolution_data = new_pokemon.evolution_data
-    
-    # Ask user to select new ability
-    print(f"Your pokemon can have these abilities:")
-    print(new_pokemon.abilities)
-    print("Which ability would you like?")
-    while True:
-        ability_input = input().lower()
-        # Find the matching ability with original casing
-        matching_ability = None
-        for ab in new_pokemon.abilities:
-            if ab.lower() == ability_input:
-                matching_ability = ab
-                break
-        if matching_ability:
-            old_pokemon.ability = matching_ability
-            break
-        else:
-            print("Invalid ability. Please choose from the list above.")
-    
-    # Commit changes to database
-    db.commit()
-    print(f"Congratulations! Your pokemon evolved into {old_pokemon.name}!")
-    
+
 
 def add_to_party_database(added_pokemon):
     db = database.SessionLocal()
@@ -402,5 +509,5 @@ def add_to_party_database(added_pokemon):
 
 
 if __name__ == "__main__":
-    main()
+    game()
 
