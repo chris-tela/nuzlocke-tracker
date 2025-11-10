@@ -32,12 +32,16 @@ class Nature(Enum):
     CAREFUL = "Careful"
     QUIRKY = "Quirky"    
 
+class Status(Enum):
+    PARTY = "Party"
+    STORED = "Stored"
+    FAINTED = "Fainted"
+
 class AllPokemon(Base):
     __tablename__ = "all_pokemon"
 
-    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
-    # poke_id cant be pkey because you can have multiple of the same pokemon on the same team
-    poke_id = Column(Integer, nullable=False)
+    id = Column(Integer, nullable=False, autoincrement=True)
+    poke_id = Column(Integer, primary_key=True, nullable=False)
     name = Column(String, nullable=False)
     types = Column(ARRAY(String), nullable=False)
     abilities = Column(ARRAY(String), nullable=False)
@@ -51,12 +55,26 @@ class AllPokemon(Base):
     evolution_data = Column(ARRAY(JSON), nullable=True)
     sprite = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
-    party_pokemon = relationship("PartyPokemon", back_populates="pokemon")
 
 class PartyPokemon(Base):
     __tablename__ = "party_pokemon"
 
     id = Column(Integer, primary_key=True, nullable=False)
+    game_file_id = Column(Integer, ForeignKey("game_files.id", ondelete="CASCADE"), nullable=False)
+
+    # Foreign key to the OwnedPokemon entry that this represents
+    owned_pokemon_id = Column(Integer, ForeignKey("owned_pokemon.id", ondelete="CASCADE"), nullable=False)
+
+    owned_pokemon = relationship("OwnedPokemon", back_populates="party_entry")
+    game_file = relationship("GameFiles", back_populates="party_pokemon")
+
+
+class OwnedPokemon(Base):
+    __tablename__ = "owned_pokemon"
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    game_file_id = Column(Integer, ForeignKey("game_files.id", ondelete="CASCADE"), nullable=False)
+
     poke_id = Column(Integer, ForeignKey("all_pokemon.poke_id", ondelete="SET NULL"), nullable=False)
     name = Column(String, nullable=False)
     nickname = Column(String, nullable=True)
@@ -65,11 +83,37 @@ class PartyPokemon(Base):
     types = Column(ARRAY(String), nullable=False)
     level = Column(Integer, nullable=False)
     gender = Column(String, nullable=True)
+    status = Column(Status, nullable=False)
     evolution_data = Column(ARRAY(JSON), nullable=True)
     sprite = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
 
-    pokemon = relationship("AllPokemon", back_populates="party_pokemon")
+    pokemon = relationship("AllPokemon")
+    party_entry = relationship("PartyPokemon", back_populates="owned_pokemon", uselist=False)
+    game_file = relationship("GameFiles", back_populates="owned_pokemon")
+
+
+class User(Base):
+    __tablename__ = "user"
+
+    id = Column(Integer, primary_key=True, nullable=False)
+    username = Column(String, nullable=False, unique=True)
+
+    # A user can have many game files
+    game_files = relationship("GameFiles", back_populates="user")
+
+
+class GameFiles(Base):
+    __tablename__ = "game_files"
+    id = Column(Integer, primary_key=True, nullable=False)
+    trainer_name = Column(String, nullable=False)
+    game_name = Column(String, nullable=False)
+    party_pokemon = relationship("PartyPokemon", back_populates="game_file", cascade="all, delete")
+    owned_pokemon = relationship("OwnedPokemon", back_populates="game_file", cascade="all, delete")
+    gym_progress = Column(ARRAY(JSON), nullable=True)
+    route_progress = Column(ARRAY(JSON), nullable=True)
+    user = relationship("User", back_populates="game_files")
+
 
 
 class Generation(Base):
