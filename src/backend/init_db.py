@@ -3,7 +3,7 @@
 from db.database import engine
 
 # remove models that you don't want to reinitialize
-from db.models import  Base, AllPokemon
+from db.models import  Base
 
 
 Base.metadata.create_all(bind=engine)

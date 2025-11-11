@@ -15,26 +15,242 @@ trainer_data = []
 route_progression = []
 gym_progression = []
 
+# Global variables to track current session
+current_user: Optional[models.User] = None
+current_game_file: Optional[models.GameFiles] = None
+
 def main():
-
+    global current_user, current_game_file
+    
     print("Welcome to the Pokemon CLI!")
-    print("What game are you playing?")
-
-    selected_game = game_choice()
-
-    print(f"You are playing {selected_game} Version")
-    print("What is your trainer name?")
-    trainer_name = input()
-    print(f"Welcome, {trainer_name}! Let's get started.")
-    print("What is your starter pokemon?")
-    trainer_data.append(selected_game)
-    trainer_data.append(trainer_name)
-    starter(selected_game)
-
-
+    
+    # Account management
+    current_user = select_or_create_user()
+    if not current_user:
+        print("Failed to select or create user. Exiting.")
+        return
+    
+    # Game file management
+    current_game_file = select_or_create_game_file(current_user)
+    if not current_game_file:
+        print("Failed to select or create game file. Exiting.")
+        return
+    
+    print(f"\nWelcome back, {current_user.username}!")
+    print(f"Playing {current_game_file.game_name} as {current_game_file.trainer_name}")
+    print("Let's get started!\n")
+    
+    # Check if this is a new game file (no pokemon yet)
+    db = database.SessionLocal()
+    try:
+        existing_pokemon = db.query(models.OwnedPokemon).filter(
+            models.OwnedPokemon.game_file_id == current_game_file.id
+        ).first()
+        
+        if not existing_pokemon:
+            print("What is your starter pokemon?")
+            # Access actual values from the model instance
+            game_name_value = getattr(current_game_file, 'game_name', '')
+            game_file_id_value = getattr(current_game_file, 'id', 0)
+            starter(str(game_name_value), int(game_file_id_value))
+    finally:
+        db.close()
+    
+    # Update trainer_data for compatibility with existing code
+    trainer_data.clear()
+    trainer_data.append(str(current_game_file.game_name))
+    trainer_data.append(str(current_game_file.trainer_name))
+    
     game()
 
 
+
+def create_account() -> Optional[models.User]:
+    """Create a new user account."""
+    db = database.SessionLocal()
+    try:
+        print("Enter a username for your new account:")
+        while True:
+            username = input().strip()
+            if not username:
+                print("Username cannot be empty. Please try again:")
+                continue
+            
+            # Check if username already exists
+            existing_user = db.query(models.User).filter(models.User.username == username).first()
+            if existing_user:
+                print(f"Username '{username}' already exists. Please choose a different username:")
+                continue
+            
+            # Create new user
+            new_user = models.User(username=username)
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            print(f"Account '{username}' created successfully!")
+            return new_user
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating account: {e}")
+        return None
+    finally:
+        db.close()
+
+def select_user() -> Optional[models.User]:
+    """Select an existing user from the database."""
+    db = database.SessionLocal()
+    try:
+        users = db.query(models.User).all()
+        
+        if not users:
+            print("No users found in database.")
+            return None
+        
+        print("\nSelect a user:")
+        for i, user in enumerate(users, 1):
+            game_count = len(user.game_files) if user.game_files else 0
+            print(f"{i}. {user.username} ({game_count} game file(s))")
+        
+        while True:
+            try:
+                choice = input("\nEnter the number of the user (or '0' to go back): ").strip()
+                if choice == '0':
+                    return None
+                
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(users):
+                    selected_user = users[choice_num - 1]
+                    db.refresh(selected_user)
+                    return selected_user
+                else:
+                    print(f"Please enter a number between 1 and {len(users)}:")
+            except ValueError:
+                print("Please enter a valid number:")
+    except Exception as e:
+        print(f"Error selecting user: {e}")
+        return None
+    finally:
+        db.close()
+
+def select_or_create_user() -> Optional[models.User]:
+    """Main function to handle user selection or creation."""
+    while True:
+        print("\n--- Account Management ---")
+        print("1. Create new account")
+        print("2. Select existing account")
+        print("3. Exit")
+        
+        choice = input("\nEnter your choice: ").strip()
+        
+        if choice == "1":
+            user = create_account()
+            if user:
+                return user
+        elif choice == "2":
+            user = select_user()
+            if user:
+                return user
+        elif choice == "3":
+            return None
+        else:
+            print("Invalid choice. Please enter 1, 2, or 3.")
+
+def create_game_file(user: models.User) -> Optional[models.GameFiles]:
+    """Create a new game file for the user."""
+    db = database.SessionLocal()
+    try:
+        print("\n--- Create New Game File ---")
+        print("What game are you playing?")
+        selected_game = game_choice()
+        
+        print(f"You are playing {selected_game} Version")
+        print("What is your trainer name?")
+        trainer_name = input().strip()
+        
+        if not trainer_name:
+            print("Trainer name cannot be empty.")
+            return None
+        
+        # Create new game file
+        new_game_file = models.GameFiles(
+            user_id=user.id,
+            trainer_name=trainer_name,
+            game_name=selected_game,
+            gym_progress=[],
+            route_progress=[]
+        )
+        db.add(new_game_file)
+        db.commit()
+        db.refresh(new_game_file)
+        print(f"Game file created: {trainer_name} - {selected_game}")
+        return new_game_file
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating game file: {e}")
+        return None
+    finally:
+        db.close()
+
+def select_game_file(user: models.User) -> Optional[models.GameFiles]:
+    """Select an existing game file for the user."""
+    db = database.SessionLocal()
+    try:
+        game_files = db.query(models.GameFiles).filter(
+            models.GameFiles.user_id == user.id
+        ).all()
+        
+        if not game_files:
+            print("No game files found for this user.")
+            return None
+        
+        print("\nSelect a game file:")
+        for i, game_file in enumerate(game_files, 1):
+            pokemon_count = len(game_file.owned_pokemon) if game_file.owned_pokemon else 0
+            print(f"{i}. {game_file.trainer_name} - {game_file.game_name} ({pokemon_count} pokemon)")
+        
+        while True:
+            try:
+                choice = input("\nEnter the number of the game file (or '0' to go back): ").strip()
+                if choice == '0':
+                    return None
+                
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(game_files):
+                    selected_game_file = game_files[choice_num - 1]
+                    db.refresh(selected_game_file)
+                    return selected_game_file
+                else:
+                    print(f"Please enter a number between 1 and {len(game_files)}:")
+            except ValueError:
+                print("Please enter a valid number:")
+    except Exception as e:
+        print(f"Error selecting game file: {e}")
+        return None
+    finally:
+        db.close()
+
+def select_or_create_game_file(user: models.User) -> Optional[models.GameFiles]:
+    """Main function to handle game file selection or creation."""
+    while True:
+        print("\n--- Game File Management ---")
+        print("1. Create new game file")
+        print("2. Select existing game file")
+        print("3. Go back to user selection")
+        
+        choice = input("\nEnter your choice: ").strip()
+        
+        if choice == "1":
+            game_file = create_game_file(user)
+            if game_file:
+                return game_file
+        elif choice == "2":
+            game_file = select_game_file(user)
+            if game_file:
+                return game_file
+        elif choice == "3":
+            return None
+        else:
+            print("Invalid choice. Please enter 1, 2, or 3.")
 
 def game_choice() -> str:
     while True:
@@ -55,7 +271,8 @@ def game_choice() -> str:
                 print("Invalid game")
     return game
 
-def starter(game: str):
+def starter(game: str, game_file_id: int):
+    """Select and add starter pokemon to the game file."""
     db = database.SessionLocal()
     try:
         version = db.query(models.Version).filter(models.Version.version_name == game).first()
@@ -76,14 +293,14 @@ def starter(game: str):
                     starter_selected = input().lower()
                     if starter_selected in starters:
                         break
+                    print("Invalid starter. Please choose from the list above:")
                 
                 # search for starter in all_pokemon db
-
                 starter_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == starter_selected).first()
 
                 if starter_data:
-                    added_pokemon = add_to_party(starter_data)
-                    add_to_party_database(added_pokemon)
+                    added_pokemon = add_to_party(starter_data, game_file_id)
+                    add_to_party_database(added_pokemon, game_file_id, db)
 
                 save_to_storage()
                 return
@@ -110,46 +327,77 @@ def game():
         if(selection == "4"):
             save_to_storage()
         
-        
+         
 
 def team():
-
-
+    global current_game_file
+    
+    if not current_game_file:
+        print("No game file selected. Please restart the application.")
+        return
+    
     db = database.SessionLocal()
+    try:
+        print("Team Status:")
+        # Get party pokemon for the current game file
+        party_pokemon_list = db.query(models.PartyPokemon).join(
+            models.OwnedPokemon
+        ).filter(
+            models.OwnedPokemon.game_file_id == current_game_file.id
+        ).all()
 
-    print("Team Status:")
-    party_pokemon_list = db.query(models.PartyPokemon).all()
 
+        if party_pokemon_list:
+            for party_pokemon in party_pokemon_list:
+                pokemon = party_pokemon.owned_pokemon
+                if not pokemon:
+                    continue
+                print("Pokemon: " + pokemon.name)
+                print("Nickname: " + (pokemon.nickname or "None"))
+                print("Level: " + str(pokemon.level))
+                print("Type(s): " + str(pokemon.types))
+                print("-----------\n")
 
-    if party_pokemon_list:
-        for pokemon in party_pokemon_list:
-            print("Pokemon: " + pokemon.name)
-            print("Nickname: " + pokemon.nickname)
-            print("Level: " + str(pokemon.level))
-            print("Type(s): " + str(pokemon.types))
-            print("-----------\n")
-
-        print("Would you like to edit any information of a pokemon?: (y = yes)")
-        edit = input().lower()
-        if(edit == "y"):
-            edit_pokemon(party_pokemon_list, db)
-    else:
-        print("Team is empty!")
+            print("Would you like to edit any information of a pokemon?: (y = yes)")
+            edit = input().lower()
+            if(edit == "y"):
+                edit_pokemon(party_pokemon_list, db)
+        else:
+            print("Team is empty!")
+    finally:
+        db.close()
 
 
 
 def edit_pokemon(party_pokemon_list, db):
+    global current_game_file
+    
+    if not current_game_file:
+        print("No game file selected.")
+        return
+    
     print("Which pokemon would you like to edit?: ")
 
-    party_pokemon = db.query(models.PartyPokemon).all()
+    # Get party pokemon for the current game file
+    party_pokemon = db.query(models.PartyPokemon).join(
+        models.OwnedPokemon
+    ).filter(
+        models.OwnedPokemon.game_file_id == current_game_file.id
+    ).all()
     i = 1
-    for pokemon in party_pokemon:
-        print(str(i) + ": " + pokemon.name)
+    for party_pokemon_entry in party_pokemon:
+        pokemon = party_pokemon_entry.owned_pokemon
+        if pokemon:
+            print(str(i) + ": " + pokemon.name)
         i += 1 
     
 
     choice = int(input().lower())
-    poke_data = party_pokemon[choice - 1] 
+    selected_party_pokemon = party_pokemon[choice - 1]
+    poke_data = selected_party_pokemon.owned_pokemon
+    if not poke_data:
+        print("Error: Pokemon data not found.")
+        return 
         
     print("Would you like to: ")
     print("1: Change Level: ")
@@ -236,6 +484,8 @@ def encounters():
         return
     
     db = database.SessionLocal()
+
+
     
                 
    
@@ -244,14 +494,28 @@ def save_to_storage():
     Save game progress to storage.json in the format specified above.
     Gets party pokemon from DB and formats all data according to the JSON structure.
     """
+    global current_game_file
+    
+    if not current_game_file:
+        print("No game file selected. Cannot save.")
+        return
+    
     db = database.SessionLocal()
     try:
-        # Get all party pokemon from database
-        party_pokemon_list = db.query(models.PartyPokemon).all()
+        # Get party pokemon for the current game file
+        party_pokemon_list = db.query(models.PartyPokemon).join(
+            models.OwnedPokemon
+        ).filter(
+            models.OwnedPokemon.game_file_id == current_game_file.id
+        ).all()
         
         # Convert party pokemon to dictionary format with all fields
         party_pokemon_json = []
-        for pokemon in party_pokemon_list:
+        for party_pokemon in party_pokemon_list:
+            pokemon = party_pokemon.owned_pokemon
+            if not pokemon:
+                continue
+                
             # Handle datetime serialization
             created_at_str = None
             if pokemon.created_at is not None:
@@ -265,7 +529,7 @@ def save_to_storage():
                 "poke_id": pokemon.poke_id,
                 "name": pokemon.name,
                 "nickname": pokemon.nickname,
-                "nature": pokemon.nature,
+                "nature": pokemon.nature.value if pokemon.nature else None,
                 "ability": pokemon.ability,
                 "types": pokemon.types,
                 "level": pokemon.level,
@@ -276,9 +540,9 @@ def save_to_storage():
             }
             party_pokemon_json.append(pokemon_dict)
         
-        # Format trainer_data from global variable or use defaults
-        trainer_name = trainer_data[1] if len(trainer_data) > 1 else ""
-        game_name = trainer_data[0] if len(trainer_data) > 0 else ""
+        # Format trainer_data from current game file
+        trainer_name = current_game_file.trainer_name
+        game_name = current_game_file.game_name
         
         trainer_data_json = {
             "trainer_name": trainer_name,
@@ -323,7 +587,8 @@ def save_to_storage():
         db.close()
 
 
-def add_to_party(pokemon_data):
+def add_to_party(pokemon_data, game_file_id: int):
+    """Create an OwnedPokemon and return it. The PartyPokemon will be created separately."""
     if pokemon_data: 
         poke_id = pokemon_data.poke_id
         name = pokemon_data.name
@@ -343,55 +608,83 @@ def add_to_party(pokemon_data):
     nickname_input = input().lower()
     if(nickname_input == "y"):
         print("Nickname: ")
-        nickname = input().lower()
+        nickname = input().strip()
     else:
-        nickname = ""
+        nickname = None
 
     print("It's nature?:")
-    nature = input().lower()    
+    nature_input = input().strip()
+    # Try to match the nature enum
+    nature = None
+    try:
+        nature = models.Nature[nature_input.upper()]
+    except (KeyError, AttributeError):
+        # If not found, try to find case-insensitive match
+        for n in models.Nature:
+            if n.value.lower() == nature_input.lower():
+                nature = n
+                break
 
     print("It's ability?")
     print(abilities)
     while True:
-        ability = input().lower()
-        if(abilities.__contains__(ability)):
+        ability = input().strip()
+        # Case-insensitive match
+        matching_ability = None
+        for ab in abilities:
+            if ab.lower() == ability.lower():
+                matching_ability = ab
+                break
+        if matching_ability:
+            ability = matching_ability
             break
+        print("Invalid ability. Please choose from the list above:")
     
     created_at = datetime.now()
 
-    added_pokemon = models.PartyPokemon(
-        poke_id = poke_id,
-        name = name,
-        nickname = nickname,
-        nature = nature,
-        ability = ability,
-        types = types,
-        level = 5,
-        gender = gender,
-        evolution_data = evolution_data,
-        sprite = sprite,
-        created_at = created_at
+    # Create OwnedPokemon first
+    owned_pokemon = models.OwnedPokemon(
+        game_file_id=game_file_id,
+        poke_id=poke_id,
+        name=name,
+        nickname=nickname,
+        nature=nature,
+        ability=ability,
+        types=types,
+        level=5,
+        gender=gender,
+        status=models.Status.PARTY,
+        evolution_data=evolution_data,
+        sprite=sprite,
+        created_at=created_at
     )
 
-    return added_pokemon
+    return owned_pokemon
 
 
 
-def add_to_party_database(added_pokemon):
-    db = database.SessionLocal()
+def add_to_party_database(owned_pokemon: models.OwnedPokemon, game_file_id: int, db: Session):
+    """Add pokemon to database and create PartyPokemon entry."""
     try:
-        db.add(added_pokemon)
+        # Add OwnedPokemon first
+        db.add(owned_pokemon)
+        db.flush()  # Flush to get the ID
+        
+        # Create PartyPokemon entry
+        party_pokemon = models.PartyPokemon(
+            game_file_id=game_file_id,
+            owned_pokemon_id=owned_pokemon.id
+        )
+        db.add(party_pokemon)
         db.commit()
         print("added to party!")
     except Exception as e:
         db.rollback()
         print(f"Error adding pokemon to database: {e}")
         raise
-    finally:
-        db.close()
 
 
 
 if __name__ == "__main__":
-    game()
+    main()
 

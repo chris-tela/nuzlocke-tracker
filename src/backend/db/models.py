@@ -1,3 +1,4 @@
+import enum
 from sqlalchemy import Column, Integer, String, Boolean, ARRAY, JSON, Enum
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
@@ -5,7 +6,7 @@ from sqlalchemy.sql.sqltypes import TIMESTAMP
 from sqlalchemy.sql.expression import text
 from .database import Base
 
-class Nature(Enum):
+class Nature(enum.Enum):
     HARDY = "Hardy"
     LONELY = "Lonely"
     BRAVE = "Brave"
@@ -32,7 +33,7 @@ class Nature(Enum):
     CAREFUL = "Careful"
     QUIRKY = "Quirky"    
 
-class Status(Enum):
+class Status(enum.Enum):
     PARTY = "Party"
     STORED = "Stored"
     FAINTED = "Fainted"
@@ -78,12 +79,12 @@ class OwnedPokemon(Base):
     poke_id = Column(Integer, ForeignKey("all_pokemon.poke_id", ondelete="SET NULL"), nullable=False)
     name = Column(String, nullable=False)
     nickname = Column(String, nullable=True)
-    nature = Column(String, nullable=True)
+    nature = Column(Enum(Nature), nullable=True)
     ability = Column(String, nullable=True)
     types = Column(ARRAY(String), nullable=False)
     level = Column(Integer, nullable=False)
     gender = Column(String, nullable=True)
-    status = Column(Status, nullable=False)
+    status = Column(Enum(Status), nullable=False)
     evolution_data = Column(ARRAY(JSON), nullable=True)
     sprite = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
@@ -106,6 +107,7 @@ class User(Base):
 class GameFiles(Base):
     __tablename__ = "game_files"
     id = Column(Integer, primary_key=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     trainer_name = Column(String, nullable=False)
     game_name = Column(String, nullable=False)
     party_pokemon = relationship("PartyPokemon", back_populates="game_file", cascade="all, delete")
