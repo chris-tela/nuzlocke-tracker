@@ -1,4 +1,5 @@
 # used to simulate the web app's core logic in the terminal
+from ast import List
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -8,7 +9,7 @@ import json
 from db import database
 from db import models
 from sqlalchemy.orm import Session
-from typing import cast, Optional
+from typing import NoReturn, cast, Optional
 
 trainer_data = []
 
@@ -326,6 +327,7 @@ def game():
             encounters()
         if(selection == "4"):
             save_to_storage()
+            exit()
         
          
 
@@ -466,27 +468,86 @@ def encounters():
     Display routes/encounters for the current game and allow user to update route progression.
     Reads game name from storage.json to query routes from database.
     """
-    # Read storage.json to get game name
-    storage_path = os.path.join(os.path.dirname(__file__), "storage.json")
-    game_name = ""
+    # call global var
+    global current_game_file
     
-    try:
-        with open(storage_path, 'r', encoding='utf-8') as f:
-            storage_data = json.load(f)
-            game_name = storage_data.get("trainer_data", {}).get("game_name", "")
-    except FileNotFoundError:
-        print("Storage file not found. Using trainer_data global variable.")
-        if len(trainer_data) > 0:
-            game_name = trainer_data[0]
-    
-    if not game_name:
-        print("No game name found. Please start a new game first.")
+    if not current_game_file:
+        print("No game file selected. Please restart the application.")
         return
     
     db = database.SessionLocal()
+    try:
+        # get current game file's 'route progression'
+        game_file = db.query(models.GameFiles).filter(
+            models.GameFiles.id == current_game_file.id
+        ).first()
+        
+        if game_file:
+            route_progress_value = getattr(game_file, 'route_progress', None)
+            route_progress = list(route_progress_value) if route_progress_value is not None else []
+        else:
+            route_progress = []
+        
+    except Exception:
+        print("Error fetching route progression data")
+        return
 
+    print("Routes discovered: " + str(route_progress))
+
+    # get versions routes ordered 
+
+    try:
+        version_data = db.query(models.Version).filter(models.Version.version_name == current_game_file.game_name).first()
+        if not version_data:
+            raise Exception("Version name not found in database!")
+        
+        locations_ordered_value = getattr(version_data, 'locations_ordered', None)
+        # Ensure it's a list, not a Column type
+        if locations_ordered_value is None:
+            locations_ordered = []
+        else:
+            locations_ordered = list(locations_ordered_value)
+
+    except Exception:
+        return
+    
+   
+    locations_undiscovered = list_difference(locations_ordered, route_progress)
 
     
+def view_locations(upcoming_locations: list):
+    LOCATIONS_TO_SHOW = 3
+
+    while True:
+        print("Enter the co-responding location # to view & edit the location!: ")
+        print("Upcoming Locations: (enter '0' to quit): ")
+        if len(upcoming_locations) < 3:
+            for i in range(len(upcoming_locations)):
+                print(str(i+1) + ":" + upcoming_locations[i])
+
+        else:
+            for i in range(LOCATIONS_TO_SHOW):
+                print(str(i+1) + ":" + upcoming_locations[i])
+            upcoming_locations = upcoming_locations[:LOCATIONS_TO_SHOW]
+        
+        choice = int(input())
+        if choice == 0: return
+        elif choice - 1 > LOCATIONS_TO_SHOW or choice - 1> len(upcoming_locations):
+            print("Please select one of the following numbers: ")
+        else:
+            location_to_view = upcoming_locations[choice - 1]
+            
+    
+
+
+
+def list_difference(list1, list2):
+    result = list1.copy()
+    for item in list2:
+        if item in result:
+            result.remove(item)
+    return result
+
                 
    
 def save_to_storage():
