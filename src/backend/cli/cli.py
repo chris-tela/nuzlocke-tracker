@@ -2,6 +2,8 @@
 from ast import List
 import sys
 import os
+
+from sqlalchemy import null
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime
@@ -12,9 +14,6 @@ from sqlalchemy.orm import Session
 from typing import NoReturn, cast, Optional
 
 trainer_data = []
-
-route_progression = []
-gym_progression = []
 
 # Global variables to track current session
 current_user: Optional[models.User] = None
@@ -509,10 +508,13 @@ def encounters():
             locations_ordered = list(locations_ordered_value)
 
     except Exception:
+        print("Error finding location names!")
         return
     
    
     locations_undiscovered = list_difference(locations_ordered, route_progress)
+
+    view_locations(locations_undiscovered)
 
     
 def view_locations(upcoming_locations: list):
@@ -522,7 +524,7 @@ def view_locations(upcoming_locations: list):
         print("Enter the co-responding location # to view & edit the location!: ")
         print("Upcoming Locations: (enter '0' to quit): ")
         if len(upcoming_locations) < 3:
-            for i in range(len(upcoming_locations)):
+            for i in range(len(upcoming_locations)-1):
                 print(str(i+1) + ":" + upcoming_locations[i])
 
         else:
@@ -536,10 +538,119 @@ def view_locations(upcoming_locations: list):
             print("Please select one of the following numbers: ")
         else:
             location_to_view = upcoming_locations[choice - 1]
-            
+            view_location(location_to_view)
+            # create function to view location
     
 
+def view_location(location_name: str):
+    db = database.SessionLocal()
+    loc = db.query(models.Route).filter(models.Route.name == location_name).first()
 
+    if loc is None:
+        print("No encounters on this location")
+        confirm_location_view(location_name)
+        return
+    
+    # Extract the actual data value, not the Column type
+    data_value = getattr(loc, 'data', None)
+    if data_value is None:
+        print("No encounters on this location")
+        confirm_location_view(location_name)
+        return
+    counter = 1
+    print("Encounters:")
+    for encounter in data_value:
+        print("--------------")
+        print(str(counter) + ":")
+        print("Pokemon: " + encounter[0])
+        print("Min Level: " + str(encounter[1]))
+        print("Max Level: " + str(encounter[2]))
+        print("Region: " + encounter[3])
+        if len(encounter) == 5:
+            print("Methods of catching: " + str(encounter[4]))
+        print("--------------")
+        counter += 1
+    print("Did you catch any pokemon on this route? (y=yes)")
+    if input() == "y":
+        while True:
+            print("Which pokemon? Use the number co-responding to the above pokemon: ")
+            pokemon_selected = int(input())
+            try:
+                pokemon = data_value[pokemon_selected - 1]
+            except Exception:
+                print("Pokemon data not found!")
+            else:
+                break
+        pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == pokemon[0]).first()
+        if pokemon_data is None:
+            print("Error finding pokemon data in database!")
+            return
+        id = getattr(current_game_file, 'id', None)
+        if id is None:
+            print("Error finding game file id!")
+            return
+        data = add_to_party(pokemon_data, id)
+        add_to_party_database(data, id, db)
+    confirm_location_view(location_name)
+            
+                
+
+
+
+
+
+
+'''
+ask user to confrim 'viewing' location, then update gamefiles route_progression
+'''
+def confirm_location_view(location_name: str):
+    global current_game_file
+    
+    if not current_game_file:
+        print("No game file selected. Please restart the application.")
+        return
+    
+    print(f"Did you view/complete {location_name}? (y=yes)")
+    confirmation = input().lower().strip()
+    
+    if confirmation != "y":
+        print("Location not confirmed. Route progression not updated.")
+        return
+    
+    db = database.SessionLocal()
+    try:
+        # Get the current game file from database
+        game_file = db.query(models.GameFiles).filter(
+            models.GameFiles.id == current_game_file.id
+        ).first()
+        
+        if not game_file:
+            print("Error: Game file not found in database.")
+            return
+        
+        # Get current route_progress
+        route_progress_value = getattr(game_file, 'route_progress', None)
+        route_progress = list(route_progress_value) if route_progress_value is not None else []
+        
+        # Add location_name if not already present
+        if location_name not in route_progress:
+            route_progress.append(location_name)
+            # Update route_progress (SQLAlchemy handles the type conversion)
+            setattr(game_file, 'route_progress', route_progress)
+            db.commit()
+            print(f"{location_name} added to route progression!")
+        else:
+            print(f"{location_name} is already in route progression.")
+        
+        # Update the global current_game_file to reflect changes
+        db.refresh(game_file)
+        current_game_file = game_file
+        
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating route progression: {e}")
+    finally:
+        db.close()
 
 def list_difference(list1, list2):
     result = list1.copy()
@@ -563,6 +674,15 @@ def save_to_storage():
     
     db = database.SessionLocal()
     try:
+        # Get the current game file from database to ensure we have latest data
+        game_file = db.query(models.GameFiles).filter(
+            models.GameFiles.id == current_game_file.id
+        ).first()
+        
+        if not game_file:
+            print("Error: Game file not found in database.")
+            return
+        
         # Get party pokemon for the current game file
         party_pokemon_list = db.query(models.PartyPokemon).join(
             models.OwnedPokemon
@@ -601,29 +721,37 @@ def save_to_storage():
             }
             party_pokemon_json.append(pokemon_dict)
         
-        # Format trainer_data from current game file
-        trainer_name = current_game_file.trainer_name
-        game_name = current_game_file.game_name
+        # Format trainer_data from game file
+        trainer_name = getattr(game_file, 'trainer_name', '')
+        game_name = getattr(game_file, 'game_name', '')
         
         trainer_data_json = {
             "trainer_name": trainer_name,
             "game_name": game_name
         }
         
+        # Get gym_progress from game file
+        gym_progress_value = getattr(game_file, 'gym_progress', None)
+        gym_progress = list(gym_progress_value) if gym_progress_value is not None else []
+        
         # Format gym_progression - convert list to dict if needed, or use as-is
         gym_progression_json = {}
-        if isinstance(gym_progression, list):
+        if isinstance(gym_progress, list):
             # If it's a list, convert to dict format
-            for i, passed in enumerate(gym_progression, 1):
+            for i, passed in enumerate(gym_progress, 1):
                 gym_progression_json[f"gym_{i}"] = passed
-        elif isinstance(gym_progression, dict):
-            gym_progression_json = gym_progression
+        elif isinstance(gym_progress, dict):
+            gym_progression_json = gym_progress
         else:
             # Default empty dict
             gym_progression_json = {}
         
+        # Get route_progress from game file
+        route_progress_value = getattr(game_file, 'route_progress', None)
+        route_progress = list(route_progress_value) if route_progress_value is not None else []
+        
         # Format route_progression - use the array format as specified
-        route_progression_json = route_progression if isinstance(route_progression, list) else []
+        route_progression_json = route_progress if isinstance(route_progress, list) else []
         
         # Build the complete gamefile structure
         gamefile = {
@@ -657,6 +785,7 @@ def add_to_party(pokemon_data, game_file_id: int):
         abilities = pokemon_data.abilities
         sprite = pokemon_data.sprite
         evolution_data = pokemon_data.evolution_data
+
 
     print("It's gender? (m or f):")
     while True:
@@ -701,6 +830,9 @@ def add_to_party(pokemon_data, game_file_id: int):
             break
         print("Invalid ability. Please choose from the list above:")
     
+    print("It's level?")
+    level = int(input())
+
     created_at = datetime.now()
 
     # Create OwnedPokemon first
@@ -712,7 +844,7 @@ def add_to_party(pokemon_data, game_file_id: int):
         nature=nature,
         ability=ability,
         types=types,
-        level=5,
+        level=level,
         gender=gender,
         status=models.Status.PARTY,
         evolution_data=evolution_data,
