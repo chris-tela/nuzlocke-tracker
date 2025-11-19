@@ -324,6 +324,8 @@ def game():
             team()
         if(selection == "2"):
             encounters()
+        if(selection == "3"):
+            gym_encounters()
         if(selection == "4"):
             save_to_storage()
             exit()
@@ -467,13 +469,21 @@ def encounters():
     Display routes/encounters for the current game and allow user to update route progression.
     Reads game name from storage.json to query routes from database.
     """
-    # call global var
-    global current_game_file
-    
-    if not current_game_file:
-        print("No game file selected. Please restart the application.")
+
+    route_progress = find_route_progress()
+
+    # get versions routes ordered 
+   
+    locations_undiscovered = find_upcoming_locations(route_progress)
+    if locations_undiscovered is None:
         return
-    
+    view_locations(locations_undiscovered)
+
+def find_route_progress():
+    global current_game_file
+    if current_game_file is None:
+        return
+
     db = database.SessionLocal()
     try:
         # get current game file's 'route progression'
@@ -493,8 +503,13 @@ def encounters():
 
     print("Routes discovered: " + str(route_progress))
 
-    # get versions routes ordered 
-
+    return route_progress
+def find_upcoming_locations(route_progress):
+    global current_game_file
+    if not current_game_file:
+        print("No game file selected. Please restart the application.")
+        return
+    db = database.SessionLocal()
     try:
         version_data = db.query(models.Version).filter(models.Version.version_name == current_game_file.game_name).first()
         if not version_data:
@@ -511,12 +526,8 @@ def encounters():
         print("Error finding location names!")
         return
     
-   
-    locations_undiscovered = list_difference(locations_ordered, route_progress)
+    return list_difference(locations_ordered, route_progress)
 
-    view_locations(locations_undiscovered)
-
-    
 def view_locations(upcoming_locations: list):
     LOCATIONS_TO_SHOW = 3
 
@@ -539,7 +550,13 @@ def view_locations(upcoming_locations: list):
         else:
             location_to_view = upcoming_locations[choice - 1]
             view_location(location_to_view)
-            # create function to view location
+            route_progress = find_route_progress()   
+   
+            upcoming_locations_placeholder = find_upcoming_locations(route_progress)
+            if upcoming_locations_placeholder is None:
+                return
+            upcoming_locations = upcoming_locations_placeholder
+           
     
 
 def view_location(location_name: str):
@@ -659,7 +676,292 @@ def list_difference(list1, list2):
             result.remove(item)
     return result
 
-                
+
+def gym_encounters():
+
+    """
+    1. display current badges/gym progression,  
+    2. ask users if they want to view future gyms (display the gyms ahead) or exit
+    3. if they want to view future gym:
+    4.  if the future gym is the NEXT gym (gyms must be passed in linear order)
+    5. then display trainers pokemon stats
+    6. then ask user if they completed this gym
+    7. if the future gym is NOT the NEXT gym, then just display the trainer pokemon stats
+    8. if the user completed the gym, update the database
+
+    to match the trainer_data.json to the pokemon game being played, find the current game files game_name, then match it to the trainer_data.json (create a special case for black-2 and white-2 to be black-white-2.json) using the version_groups column in .generation . 
+    """
+    global current_game_file
+    
+    if not current_game_file:
+        print("No game file selected. Please restart the application.")
+        return
+    
+    db = database.SessionLocal()
+    try:
+        # 1. Display current badges/gym progression
+        game_file = db.query(models.GameFiles).filter(
+            models.GameFiles.id == current_game_file.id
+        ).first()
+        
+        if not game_file:
+            print("Error: Game file not found in database.")
+            return
+        
+        gym_progress_value = getattr(game_file, 'gym_progress', None)
+        gym_progress = list(gym_progress_value) if gym_progress_value is not None else []
+        
+        print("\nCurrent Gym Progression:")
+        if gym_progress:
+            # Display completed gyms
+            for i, gym_data in enumerate(gym_progress, 1):
+                if isinstance(gym_data, dict):
+                    gym_num = gym_data.get('gym_number', str(i))
+                    location = gym_data.get('location', 'Unknown')
+                    badge_name = gym_data.get('badge_name', '')
+                    print(f"Gym {gym_num}: {location} - {badge_name}")
+                else:
+                    print(f"Gym {i}: {gym_data}")
+        else:
+            print("No gyms completed yet.")
+        
+        # Get trainer data filename
+        game_name_value = getattr(current_game_file, 'game_name', '')
+        trainer_data_file = get_trainer_data_filename(str(game_name_value), db)
+        if not trainer_data_file:
+            print("Error: Could not determine trainer data file for this game.")
+            return
+        
+        # Load trainer data
+        trainer_data_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scrape",
+            "trainer_data",
+            trainer_data_file
+        )
+        
+        if not os.path.exists(trainer_data_path):
+            print(f"Error: Trainer data file not found: {trainer_data_path}")
+            return
+        
+        with open(trainer_data_path, 'r', encoding='utf-8') as f:
+            all_trainers = json.load(f)
+        
+        # Filter for gyms only (exclude Elite Four and Champion)
+        gym_trainers = [
+            trainer for trainer in all_trainers 
+            if trainer.get('location') not in ['Elite Four', 'Champion'] and trainer.get('gym_number')
+        ]
+        
+        # Get unique gyms in order (gym_number 1-8)
+        unique_gyms = {}
+        for trainer in gym_trainers:
+            gym_num = trainer.get('gym_number')
+            location = trainer.get('location', '')
+            if gym_num and gym_num not in unique_gyms:
+                unique_gyms[gym_num] = {
+                    'gym_number': gym_num,
+                    'location': location,
+                    'badge_name': trainer.get('badge_name', ''),
+                    'trainers': []
+                }
+            if gym_num in unique_gyms:
+                unique_gyms[gym_num]['trainers'].append(trainer)
+        
+        # Sort gyms by number
+        gym_list = sorted(unique_gyms.values(), key=lambda x: int(x['gym_number']))
+        
+        # Get completed gym numbers
+        completed_gym_numbers = set()
+        for gym_data in gym_progress:
+            if isinstance(gym_data, dict):
+                completed_gym_numbers.add(gym_data.get('gym_number', ''))
+            elif isinstance(gym_data, str):
+                # Try to extract gym number if it's a string
+                completed_gym_numbers.add(gym_data)
+        
+        # Filter upcoming gyms
+        upcoming_gyms = [
+            gym for gym in gym_list 
+            if gym['gym_number'] not in completed_gym_numbers
+        ]
+        
+        if not upcoming_gyms:
+            print("\nAll gyms completed!")
+            return
+        
+        # 2. Ask users if they want to view future gyms or exit
+        while True:
+            print("\nUpcoming Gyms:")
+            for i, gym in enumerate(upcoming_gyms, 1):
+                print(f"{i}. Gym {gym['gym_number']}: {gym['location']} - {gym['badge_name']}")
+            print("0. Exit")
+            
+            choice = input("\nEnter the number of the gym to view (or '0' to exit): ").strip()
+            
+            if choice == '0':
+                return
+            
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(upcoming_gyms):
+                    selected_gym = upcoming_gyms[choice_num - 1]
+                    
+                    # Check if this is the next gym (first in upcoming list)
+                    is_next_gym = (choice_num == 1)
+                    
+                    # Display trainers pokemon stats
+                    display_gym_trainers(selected_gym)
+                    
+                    # If it's the next gym, ask if completed
+                    if is_next_gym:
+                        print(f"\nDid you complete Gym {selected_gym['gym_number']}? (y=yes)")
+                        completed = input().lower().strip()
+                        if completed == 'y':
+                            # Update database
+                            update_gym_progress(selected_gym, db)
+                            # Refresh the gym progress
+                            db.refresh(game_file)
+                            gym_progress_value = getattr(game_file, 'gym_progress', None)
+                            gym_progress = list(gym_progress_value) if gym_progress_value is not None else []
+                            # Recalculate completed gym numbers
+                            completed_gym_numbers = set()
+                            for gym_data in gym_progress:
+                                if isinstance(gym_data, dict):
+                                    completed_gym_numbers.add(gym_data.get('gym_number', ''))
+                                elif isinstance(gym_data, str):
+                                    completed_gym_numbers.add(gym_data)
+                            # Update upcoming gyms list
+                            upcoming_gyms = [
+                                gym for gym in gym_list 
+                                if gym['gym_number'] not in completed_gym_numbers
+                            ]
+                else:
+                    print(f"Please enter a number between 1 and {len(upcoming_gyms)}:")
+            except ValueError:
+                print("Please enter a valid number:")
+            except Exception as e:
+                print(f"Error: {e}")
+    finally:
+        db.close()
+
+
+def get_trainer_data_filename(game_name: str, db: Session) -> Optional[str]:
+    """Get the trainer data JSON filename based on game name and version groups."""
+    # Special case for black-2 and white-2
+    if game_name in ['black-2', 'white-2']:
+        return 'black-white-2_trainers.json'
+    
+    # Try to find the version in the database
+    version = db.query(models.Version).filter(models.Version.version_name == game_name).first()
+    if not version:
+        # Fallback: try to construct filename directly
+        return f'{game_name}_trainers.json'
+    
+    # Get generation to access version_groups
+    gen = db.query(models.Generation).filter(
+        models.Generation.generation_id == version.generation_id
+    ).first()
+    
+    if not gen:
+        return f'{game_name}_trainers.json'
+    
+    version_groups = getattr(gen, 'version_groups', [])
+    version_groups = list(version_groups) if version_groups else []
+    
+    # Map version groups to trainer data filenames
+    # Common patterns: black-white, diamond-pearl, ruby-sapphire, etc.
+    for vg in version_groups:
+        # Convert version_group to filename format
+        # e.g., "black-white" -> "black-white_trainers.json"
+        filename = f'{vg}_trainers.json'
+        # Check if file exists
+        trainer_data_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "scrape",
+            "trainer_data",
+            filename
+        )
+        if os.path.exists(trainer_data_path):
+            return filename
+    
+    # Fallback to game_name format
+    return f'{game_name}_trainers.json'
+
+
+def display_gym_trainers(gym: dict):
+    """Display trainer pokemon stats for a gym."""
+    print(f"\n--- Gym {gym['gym_number']}: {gym['location']} ---")
+    print(f"Badge: {gym['badge_name']}")
+    
+    for i, trainer in enumerate(gym['trainers'], 1):
+        print(f"\nTrainer {i}: {trainer.get('trainer_name', 'Unknown')}")
+        if trainer.get('badge_type'):
+            print(f"Type: {trainer.get('badge_type')}")
+        
+        pokemon_list = trainer.get('pokemon', [])
+        if pokemon_list:
+            print("Pokemon:")
+            for poke in pokemon_list:
+                name = poke.get('name', 'Unknown')
+                level = poke.get('level', '?')
+                print(f"  - {name} (Level {level})")
+        else:
+            print("No pokemon data available.")
+
+
+def update_gym_progress(gym: dict, db: Session):
+    """Update the database with completed gym."""
+    global current_game_file
+    
+    if not current_game_file:
+        print("No game file selected.")
+        return
+    
+    try:
+        game_file = db.query(models.GameFiles).filter(
+            models.GameFiles.id == current_game_file.id
+        ).first()
+        
+        if not game_file:
+            print("Error: Game file not found in database.")
+            return
+        
+        # Get current gym_progress
+        gym_progress_value = getattr(game_file, 'gym_progress', None)
+        gym_progress = list(gym_progress_value) if gym_progress_value is not None else []
+        
+        # Create gym data entry
+        gym_data = {
+            'gym_number': gym['gym_number'],
+            'location': gym['location'],
+            'badge_name': gym['badge_name']
+        }
+        
+        # Add to gym_progress if not already there
+        gym_number = gym['gym_number']
+        already_exists = any(
+            (isinstance(g, dict) and g.get('gym_number') == gym_number) or
+            (isinstance(g, str) and g == gym_number)
+            for g in gym_progress
+        )
+        
+        if not already_exists:
+            gym_progress.append(gym_data)
+            setattr(game_file, 'gym_progress', gym_progress)
+            db.commit()
+            
+            # Update global current_game_file
+            db.refresh(game_file)
+            current_game_file = game_file
+            
+            print(f"Gym {gym['gym_number']} added to gym progression!")
+        else:
+            print(f"Gym {gym['gym_number']} is already in gym progression.")
+            
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating gym progression: {e}")      
    
 def save_to_storage():
     """
