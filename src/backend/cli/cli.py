@@ -405,6 +405,7 @@ def edit_pokemon(party_pokemon_list, db):
     print("Would you like to: ")
     print("1: Change Level: ")
     print("2: Edit name: ")
+    print("3: Update Status: ")
     choice = input().lower()
     if(choice == "1"):
         print("Current level is: " + str(poke_data.level))
@@ -428,6 +429,23 @@ def edit_pokemon(party_pokemon_list, db):
             print(f"Pokemon level updated to {level}!")
         else:
             print("Invalid level. Level must be between 1 and 100.")
+    elif(choice == "3"):
+        print("1: Update Pokemon Status to Fainted: ")
+        print("2: Update Pokemon Status to Storage: ")
+        choice = input()
+
+        if(choice == "1"):
+            update_status(models.Status.FAINTED, poke_data, db)
+        elif(choice == "2"):
+            update_status(models.Status.STORED, poke_data, db)
+        else:
+            pass
+def update_status(status: models.Status, poke_data, db):
+    poke_data.status = status
+
+    print("Status updated!")
+    db.commit()
+
 # replace pokemon with it's evolved form
 def evolve(old_pokemon, new_pokemon, db):
     """
