@@ -441,6 +441,16 @@ def edit_pokemon(party_pokemon_list, db):
         else:
             pass
 def update_status(status: models.Status, poke_data, db):
+    # if pokemon was in party, take him out
+    if poke_data.status is models.Status.PARTY:
+        party_data = db.query(models.PartyPokemon).filter(models.PartyPokemon.game_file_id == poke_data.game_file_id and models.PartyPokemon.owned_pokemon_id == poke_data.id).first()
+
+        if party_data is None:
+            print("Database error!")
+        
+        else:
+            db.delete(party_data)
+
     poke_data.status = status
 
     print("Status updated!")
