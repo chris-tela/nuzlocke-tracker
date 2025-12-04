@@ -299,7 +299,7 @@ def starter(game: str, game_file_id: int):
                 starter_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == starter_selected).first()
 
                 if starter_data:
-                    added_pokemon = add_to_party(starter_data, game_file_id)
+                    added_pokemon = add_to_team(starter_data, game_file_id)
                     add_to_party_database(added_pokemon, game_file_id, db)
 
                 save_to_storage()
@@ -343,20 +343,16 @@ def team():
     try:
         print("Team Status:")
         # Get party pokemon for the current game file
-        party_pokemon_list = db.query(models.PartyPokemon).join(
-            models.OwnedPokemon
-        ).filter(
-            models.OwnedPokemon.game_file_id == current_game_file.id
+        party_pokemon_list = db.query(models.OwnedPokemon).filter(
+            models.OwnedPokemon.game_file_id == current_game_file.id,
+            models.OwnedPokemon.status == models.Status.PARTY
         ).all()
 
 
         if party_pokemon_list:
-            for party_pokemon in party_pokemon_list:
-                pokemon = party_pokemon.owned_pokemon
-                if not pokemon:
-                    continue
+            for pokemon in party_pokemon_list:
                 print("Pokemon: " + pokemon.name)
-                print("Nickname: " + (pokemon.nickname or "None"))
+                print("Nickname: " + (pokemon.nickname or "None"))  # type: ignore[operator]
                 print("Level: " + str(pokemon.level))
                 print("Type(s): " + str(pokemon.types))
                 print("-----------\n")
@@ -382,22 +378,19 @@ def edit_pokemon(party_pokemon_list, db):
     print("Which pokemon would you like to edit?: ")
 
     # Get party pokemon for the current game file
-    party_pokemon = db.query(models.PartyPokemon).join(
-        models.OwnedPokemon
-    ).filter(
-        models.OwnedPokemon.game_file_id == current_game_file.id
+    party_pokemon = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.game_file_id == current_game_file.id,
+        models.OwnedPokemon.status == models.Status.PARTY
     ).all()
     i = 1
-    for party_pokemon_entry in party_pokemon:
-        pokemon = party_pokemon_entry.owned_pokemon
+    for pokemon in party_pokemon:
         if pokemon:
             print(str(i) + ": " + pokemon.name)
         i += 1 
     
 
     choice = int(input().lower())
-    selected_party_pokemon = party_pokemon[choice - 1]
-    poke_data = selected_party_pokemon.owned_pokemon
+    poke_data = party_pokemon[choice - 1]
     if not poke_data:
         print("Error: Pokemon data not found.")
         return 
@@ -442,17 +435,8 @@ def edit_pokemon(party_pokemon_list, db):
             pass
 def update_status(status: models.Status, poke_data, db):
     # if pokemon was in party, take him out
-    if poke_data.status is models.Status.PARTY:
-        party_data = db.query(models.PartyPokemon).filter(models.PartyPokemon.game_file_id == poke_data.game_file_id and models.PartyPokemon.owned_pokemon_id == poke_data.id).first()
-
-        if party_data is None:
-            print("Database error!")
-        
-        else:
-            db.delete(party_data)
 
     poke_data.status = status
-
     print("Status updated!")
     db.commit()
 
@@ -634,7 +618,7 @@ def view_location(location_name: str):
         if id is None:
             print("Error finding game file id!")
             return
-        data = add_to_party(pokemon_data, id)
+        data = add_to_team(pokemon_data, id, int(pokemon[1]), int(pokemon[2]))
         add_to_party_database(data, id, db)
     confirm_location_view(location_name)
             
@@ -1014,19 +998,14 @@ def save_to_storage():
             return
         
         # Get party pokemon for the current game file
-        party_pokemon_list = db.query(models.PartyPokemon).join(
-            models.OwnedPokemon
-        ).filter(
-            models.OwnedPokemon.game_file_id == current_game_file.id
+        party_pokemon_list = db.query(models.OwnedPokemon).filter(
+            models.OwnedPokemon.game_file_id == current_game_file.id,
+            models.OwnedPokemon.status == models.Status.PARTY
         ).all()
         
         # Convert party pokemon to dictionary format with all fields
         party_pokemon_json = []
-        for party_pokemon in party_pokemon_list:
-            pokemon = party_pokemon.owned_pokemon
-            if not pokemon:
-                continue
-                
+        for pokemon in party_pokemon_list:
             # Handle datetime serialization
             created_at_str = None
             if pokemon.created_at is not None:
@@ -1040,7 +1019,7 @@ def save_to_storage():
                 "poke_id": pokemon.poke_id,
                 "name": pokemon.name,
                 "nickname": pokemon.nickname,
-                "nature": pokemon.nature.value if pokemon.nature else None,
+                "nature": pokemon.nature.value if pokemon.nature else None,  # type: ignore[misc]
                 "ability": pokemon.ability,
                 "types": pokemon.types,
                 "level": pokemon.level,
@@ -1106,8 +1085,8 @@ def save_to_storage():
         db.close()
 
 
-def add_to_party(pokemon_data, game_file_id: int):
-    """Create an OwnedPokemon and return it. The PartyPokemon will be created separately."""
+def add_to_team(pokemon_data, game_file_id: int,  min_level: int = 0, max_level: int = 0):
+    """Create an OwnedPokemon and return it."""
     if pokemon_data: 
         poke_id = pokemon_data.poke_id
         name = pokemon_data.name
@@ -1160,8 +1139,22 @@ def add_to_party(pokemon_data, game_file_id: int):
             break
         print("Invalid ability. Please choose from the list above:")
     
-    print("It's level?")
-    level = int(input())
+    if(min_level > 0 and max_level > 0 ):
+        print("It's level (between " + str(min_level) + "-" + str(max_level)+ ")?")
+        while True:
+            level = int(input())
+            if level > max_level or level < min_level:
+                print("Error! Please input between the min and max level")
+            else:
+                break
+
+    else:
+        print("It's level? ")
+        level = int(input())
+
+
+
+
 
     created_at = datetime.now()
 
@@ -1176,7 +1169,7 @@ def add_to_party(pokemon_data, game_file_id: int):
         types=types,
         level=level,
         gender=gender,
-        status=models.Status.PARTY,
+        status=models.Status.UNKNOWN,
         evolution_data=evolution_data,
         sprite=sprite,
         created_at=created_at
@@ -1187,24 +1180,70 @@ def add_to_party(pokemon_data, game_file_id: int):
 
 
 def add_to_party_database(owned_pokemon: models.OwnedPokemon, game_file_id: int, db: Session):
-    """Add pokemon to database and create PartyPokemon entry."""
+    """Add pokemon to database and set status to PARTY if added to party."""
     try:
         # Add OwnedPokemon first
         db.add(owned_pokemon)
         db.flush()  # Flush to get the ID
         
-        # Create PartyPokemon entry
-        party_pokemon = models.PartyPokemon(
-            game_file_id=game_file_id,
-            owned_pokemon_id=owned_pokemon.id
-        )
-        db.add(party_pokemon)
+        # check if party has 6 pokemon first
+        party = db.query(models.OwnedPokemon).filter(
+            models.OwnedPokemon.game_file_id == game_file_id,
+            models.OwnedPokemon.status == models.Status.PARTY
+        ).all()
+        party_input = ""
+        if party is None:
+            print("Error accessing party!")
+            raise
+        if len(party) >= 6:
+            print("Party is full! Would you like to swap a pokemon in your party for " + owned_pokemon.name + " (s), or keep in storage (n)?")
+            party_input = input()
+            if party_input == "s":
+                swap_pokemon(owned_pokemon, game_file_id, db)
+            elif party_input == "n":
+                owned_pokemon.status = models.Status.STORED  # type: ignore[assignment]
+        elif len(party) < 6 or party_input == "s":
+            # Set status to PARTY if party is not full or if swap has been made
+            owned_pokemon.status = models.Status.PARTY # type: ignore[assignment]
+        
         db.commit()
-        print("added to party!")
+        print("update complete!")
     except Exception as e:
         db.rollback()
         print(f"Error adding pokemon to database: {e}")
         raise
+
+def swap_pokemon(owned_pokemon: models.OwnedPokemon, game_file_id: int, db: Session):
+    party_data = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.status == models.Status.PARTY,
+        models.OwnedPokemon.game_file_id == game_file_id
+    ).all()
+    if party_data is None:
+        print("Error accessing party pokemon!")
+        raise
+    while True:
+        i = 1
+        for pokemon in party_data:
+            print(str(i) + ": " + pokemon.name)
+            i += 1
+        print("Enter the co-responding number of the pokemon you'd like swapped: ")
+        try:
+            swap_input = int(input())
+            if swap_input < 1 or swap_input > len(party_data):
+                print(f"Invalid selection. Please enter a number between 1 and {len(party_data)}.")
+                continue
+            swapped_pokemon = party_data[swap_input - 1]
+            print("Swapping with " + swapped_pokemon.name + "...")
+            break
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+
+    update_status(models.Status.STORED, swapped_pokemon, db)
+
+    
 
 
 

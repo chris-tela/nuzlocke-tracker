@@ -37,6 +37,7 @@ class Status(enum.Enum):
     PARTY = "Party"
     STORED = "Stored"
     FAINTED = "Fainted"
+    UNKNOWN = "Unknown"
 
 class AllPokemon(Base):
     __tablename__ = "all_pokemon"
@@ -56,18 +57,6 @@ class AllPokemon(Base):
     evolution_data = Column(ARRAY(JSON), nullable=True)
     sprite = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
-
-class PartyPokemon(Base):
-    __tablename__ = "party_pokemon"
-
-    id = Column(Integer, primary_key=True, nullable=False)
-    game_file_id = Column(Integer, ForeignKey("game_files.id", ondelete="CASCADE"), nullable=False)
-
-    # Foreign key to the OwnedPokemon entry that this represents
-    owned_pokemon_id = Column(Integer, ForeignKey("owned_pokemon.id", ondelete="CASCADE"), nullable=False)
-
-    owned_pokemon = relationship("OwnedPokemon", back_populates="party_entry")
-    game_file = relationship("GameFiles", back_populates="party_pokemon")
 
 
 class OwnedPokemon(Base):
@@ -90,7 +79,6 @@ class OwnedPokemon(Base):
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
 
     pokemon = relationship("AllPokemon")
-    party_entry = relationship("PartyPokemon", back_populates="owned_pokemon", uselist=False)
     game_file = relationship("GameFiles", back_populates="owned_pokemon")
 
 
@@ -110,13 +98,12 @@ class GameFiles(Base):
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     trainer_name = Column(String, nullable=False)
     game_name = Column(String, nullable=False)
-    party_pokemon = relationship("PartyPokemon", back_populates="game_file", cascade="all, delete")
     owned_pokemon = relationship("OwnedPokemon", back_populates="game_file", cascade="all, delete")
     gym_progress = Column(ARRAY(JSON), nullable=True)
     route_progress = Column(ARRAY(JSON), nullable=True)
     user = relationship("User", back_populates="game_files")
 
-
+    # TODO: Last save
 
 class Generation(Base):
     __tablename__ = "generation"
