@@ -27,8 +27,8 @@ def scrape_trainers(url):
         
         for section in all_sections:
             section_id = section.get('id', '')
-            section_type = section_id.split('-')[0] if '-' in section_id else ''
-            section_number = section_id.split('-')[1] if '-' in section_id else ''
+            section_type = section_id.split('-')[0] if '-' in section_id else '' # type: ignore
+            section_number = section_id.split('-')[1] if '-' in section_id else '' # type: ignore
             
             # Extract location from the header text
             location = section.get_text(strip=True)
