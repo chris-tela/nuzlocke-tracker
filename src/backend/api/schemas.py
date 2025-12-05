@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class UserBase(BaseModel):
     username: str
     email: Optional[str] = None
-    oauth_provider: Optional[str] = None  # e.g., "google", "github"
+    oauth_provider: Optional[str] = None  # e.g., "google"
     oauth_provider_id: Optional[str] = None  # Provider's user ID
 
 class UserCreate(UserBase):

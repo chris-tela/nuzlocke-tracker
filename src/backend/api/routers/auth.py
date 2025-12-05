@@ -13,7 +13,7 @@ from jose import jwt
 from .. import config, google
 from ..dependencies import get_db, get_current_user
 from ..schemas import OAuthTokenResponse, UserResponse
-from db import models
+from ...db import models
 
 router = APIRouter()
 
