@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Import routers
-from api.routers import auth, users, game_files, pokemon, routes, gyms, versions
+# Import routers (package-relative imports)
+from .routers import auth, users, game_files, pokemon, routes, gyms, versions
 
 app = FastAPI(
     title="Nuzlocke Tracker API",

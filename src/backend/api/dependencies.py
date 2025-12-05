@@ -7,8 +7,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from db import database, models
-from api.config import SECRET_KEY, ALGORITHM
-from api.schemas import TokenData
+from .config import SECRET_KEY, ALGORITHM
+from .schemas import TokenData
 
 security = HTTPBearer()
 

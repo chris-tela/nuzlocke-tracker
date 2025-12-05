@@ -1,0 +1,40 @@
+export enum Nature {
+  HARDY = 'Hardy',
+  LONELY = 'Londy',
+  BRAVE = 'Brave',
+  ADAMANT = 'Adamant',
+  NAUGHTY = 'Naughty',
+  BOLD = 'Bold',
+  DOCILE = 'Docile',
+  RELAXED = 'Relaxed',
+  IMPISH = 'Impish',
+  LAX = 'Lax',
+  TIMID = 'Timid',
+  HASTY = 'Hasty',
+  SERIOUS = 'Serious',
+  JOLLY = 'Jolly',
+  NAIVE = 'Naive',
+  MODEST = 'Modest',
+  MILD = 'Mild',
+  QUIET = 'Quiet',
+  BASHFUL = 'Bashful',
+  RASH = 'Rash',
+  CALM = 'Calm',
+  GENTLE = 'Gentle',
+  SASSY = 'Sassy',
+  CAREFUL = 'Careful',
+  QUIRKY = 'Quirky',
+}
+
+export type NatureValue = `${Nature}`;
+
+export enum Status {
+  PARTY = 'Party',
+  STORED = 'Stored',
+  FAINTED = 'Fainted',
+  UNKNOWN = 'Unknown',
+}
+
+export type StatusValue = `${Status}`;
+
+
