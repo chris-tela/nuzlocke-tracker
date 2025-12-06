@@ -14,12 +14,11 @@ import bcrypt
 import hashlib
 from .. import config, google
 from ..dependencies import get_db, get_current_user
-from ..schemas import TokenResponse, UserRegister, UserLogin, UserResponse
+from ..schemas import TokenResponse, UserRegister, UserLogin, UserResponse, UserUpdate
 from ...db import models
 
 router = APIRouter()
 
-# Password hashing - using bcrypt directly to avoid passlib initialization issues
 
 # In-memory state storage (use Redis/cache in production)
 oauth_states: dict[str, datetime] = {}
@@ -27,7 +26,6 @@ oauth_states: dict[str, datetime] = {}
 def create_access_token(user_id: int) -> str:
     """Create a JWT access token for the user."""
     expire = datetime.utcnow() + timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
-    # JWT 'sub' (subject) must be a string, not an integer
     payload = {"sub": str(user_id), "exp": expire}
     return jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
 
@@ -111,6 +109,52 @@ def get_or_create_user(db: Session, google_user_info: dict) -> models.User:
             db.refresh(user)
     
     return user
+
+async def update_current_user_profile(
+    update_data: UserUpdate,
+    user: models.User,
+    db: Session
+):
+    if update_data.username is not None:
+        new_username = update_data.username.strip() # removes whitespace
+
+        if not new_username:
+            raise HTTPException(status_code=400, detail="New username is empty!")
+        
+        # check if username already exists
+        existing_user = db.query(models.User).filter(models.User.username == new_username,
+                                                     models.User.id != user.id).first()
+        
+        if existing_user:
+            raise HTTPException(status_code=409, detail="Username is taken!")
+        
+        # no existing user
+        user.username = new_username # type: ignore
+
+    if update_data.email is not None:
+        new_email = update_data.email.strip()
+
+        if not new_email:
+            raise HTTPException(status_code=400, detail="New email is empty!")
+        
+        existing_email = db.query(models.User).filter(models.User.email == new_email,
+                                                      models.User.id != user.id).first()
+        
+        if existing_email:
+            raise HTTPException(status_code=409, detail="Username is taken!")
+        
+        user.email = new_email # type: ignore 
+    
+    if update_data.email is None and update_data.username is None:
+        raise HTTPException(status_code=400, detail="No field provided!")
+    else:
+        db.commit()
+        db.refresh(user) # updated data
+
+    # returns json formatted of updated user
+    return UserResponse.model_validate(user)
+
+
 
 # JWT Authentication Endpoints
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)

@@ -23,6 +23,11 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+class UserUpdate(BaseModel):
+    """Schema for updating user profile. All fields are optional for partial updates."""
+    username: Optional[str] = None
+    email: Optional[str] = None
+
 # Game File Schemas
 class GameFileBase(BaseModel):
     trainer_name: str
