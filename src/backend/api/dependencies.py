@@ -40,16 +40,30 @@ async def get_current_user(
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: Optional[int] = payload.get("sub")
-        if user_id is None:
+        # JWT 'sub' is stored as string, convert back to int
+        user_id_str: Optional[str] = payload.get("sub")
+        if user_id_str is None:
+            raise credentials_exception
+        try:
+            user_id = int(user_id_str)
+        except (ValueError, TypeError):
             raise credentials_exception
         token_data = TokenData(user_id=user_id)
-    except JWTError:
-        raise credentials_exception
+    except JWTError as e:
+        # More detailed error for debugging
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Could not validate credentials: {str(e)}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     user = db.query(models.User).filter(models.User.id == token_data.user_id).first()
     if user is None:
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"User with ID {token_data.user_id} not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     
     return user
 

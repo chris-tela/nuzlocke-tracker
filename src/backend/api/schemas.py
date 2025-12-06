@@ -89,7 +89,20 @@ class GymProgressResponse(BaseModel):
     gym_progress: List[Dict[str, Any]]
     upcoming_gyms: List[Dict[str, Any]]
 
-# OAuth Schemas
+# Authentication Schemas
+class UserRegister(BaseModel):
+    username: str
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
 class OAuthTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

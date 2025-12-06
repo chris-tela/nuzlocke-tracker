@@ -87,6 +87,10 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, nullable=False)
     username = Column(String, nullable=False, unique=True)
+    hashed_password = Column(String, nullable=True)  # Nullable for OAuth users
+    email = Column(String, nullable=True, unique=True)  # For OAuth users
+    oauth_provider = Column(String, nullable=True)  # e.g., "google"
+    oauth_provider_id = Column(String, nullable=True)  # OAuth provider's user ID
 
     # A user can have many game files
     game_files = relationship("GameFiles", back_populates="user")
