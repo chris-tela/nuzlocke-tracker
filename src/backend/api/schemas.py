@@ -5,6 +5,8 @@ These replace input() calls from CLI and provide JSON serialization.
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
+from ..db import models
+from ..db.models import Nature, Status
 
 # User Schemas
 class UserBase(BaseModel):
@@ -48,17 +50,23 @@ class GameFileResponse(GameFileBase):
 
 # Pokemon Schemas
 class PokemonBase(BaseModel):
+    id: int
+    game_file_id: int
     poke_id: int
     name: str
     nickname: Optional[str] = None
-    nature: Optional[str] = None
+    nature: Optional[Nature] = None
     ability: Optional[str] = None
     types: List[str]
     level: int = Field(ge=1, le=100)
     gender: Optional[str] = None
-    status: str
-    sprite: str
+    status: Status
     evolution_data: Optional[List[Dict[str, Any]]] = None
+    sprite: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 class PokemonCreate(PokemonBase):
     game_file_id: int
@@ -66,15 +74,10 @@ class PokemonCreate(PokemonBase):
 class PokemonUpdate(BaseModel):
     level: Optional[int] = Field(None, ge=1, le=100)
     nickname: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[Status] = None
 
 class PokemonResponse(PokemonBase):
-    id: int
-    game_file_id: int
-    created_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
+    pass  # Inherits everything from PokemonBase including Config
 
 # Route Schemas
 class RouteProgressUpdate(BaseModel):

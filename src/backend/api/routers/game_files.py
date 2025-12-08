@@ -68,7 +68,7 @@ async def get_game_files(
 async def get_game_file(game_file_id: int, user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)):
 
-    game_file = db.query(models.GameFiles).filter(models.GameFiles.id == {game_file_id}).first()
+    game_file = db.query(models.GameFiles).filter(models.GameFiles.id == game_file_id).first()
 
     if game_file is None:
         raise HTTPException(404, "Game File ID not found!")
@@ -80,5 +80,24 @@ async def get_game_file(game_file_id: int, user: models.User = Depends(get_curre
         
 
 # @router.put("/{game_file_id}")
-# @router.delete("/{game_file_id}")
+
+@router.delete("/{game_file_id}")
+async def delete_game_file(game_file_id: int, user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)):
+
+    # make sure game file exists
+
+    game_file = db.query(models.GameFiles).filter(models.GameFiles.id == game_file_id).first()
+
+    if game_file is None:
+        raise HTTPException(status_code=404, detail="Game File Not Found!")
+    
+    if game_file.user_id is not user.id:
+        raise HTTPException(status_code = 403, detail="File ID does not belong to user!")
+    
+    db.delete(game_file)
+    db.commit()
+
+
+    return status.HTTP_200_OK
 
