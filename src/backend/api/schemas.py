@@ -68,9 +68,14 @@ class PokemonBase(BaseModel):
     class Config:
         from_attributes = True
 
-class PokemonCreate(PokemonBase):
-    game_file_id: int
-
+class PokemonCreate(BaseModel):
+    poke_id: int
+    nickname: Optional[str] = None
+    nature: Optional[Nature] = None
+    ability: Optional[str] = None
+    level: int = Field(ge=1, le=100)
+    gender: Optional[str] = None
+    status: Status
 class PokemonUpdate(BaseModel):
     level: Optional[int] = Field(None, ge=1, le=100)
     nickname: Optional[str] = None

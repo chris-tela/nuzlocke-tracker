@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from ...db import models
 from ..dependencies import get_db, get_current_user
-from ..schemas import PokemonResponse
+from ..schemas import PokemonResponse, PokemonCreate, PokemonBase
 
 router = APIRouter()
 
@@ -54,13 +54,83 @@ async def get_all_pokemon(
     # Return list of pokemon (empty list if no pokemon)
     return [PokemonResponse.model_validate(pokemon) for pokemon in owned_pokemon]
     
+
+    
+@router.get("/game-files/{game_file_id}/pokemon/party")
+async def get_party_pokemon(game_file_id: int,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)):
+    game_file = verify_game_file(game_file_id, user, db)
+
+    owned_pokemon = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.game_file_id == game_file.id
+    ).all()
+
+    # Return list of pokemon (empty list if no pokemon)
+    return [PokemonResponse.model_validate(pokemon) for pokemon in owned_pokemon if pokemon.status is models.Status.PARTY]
+@router.get("/game-files/{game_file_id}/pokemon/storage")
+async def get_stored_pokemon(game_file_id: int,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)):
+
+    game_file = verify_game_file(game_file_id, user, db)
+    owned_pokemon = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.game_file_id == game_file.id
+    ).all()
+
+    # Return list of pokemon (empty list if no pokemon)
+    return [PokemonResponse.model_validate(pokemon) for pokemon in owned_pokemon if pokemon.status is models.Status.STORED]
+ 
+@router.get("/game-files/{game_file_id}/pokemon/fainted")
+async def get_fainted_pokemon(game_file_id: int,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)):
+
+    game_file = verify_game_file(game_file_id, user, db)
+    owned_pokemon = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.game_file_id == game_file.id
+    ).all()
+
+    # Return list of pokemon (empty list if no pokemon)
+    return [PokemonResponse.model_validate(pokemon) for pokemon in owned_pokemon if pokemon.status is models.Status.FAINTED]
+ 
+
+@router.post("/game-files/{game_file_id}/pokemon")
+async def create_pokemon(game_file_id: int, pokemon: PokemonCreate,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)):
+
+    game_file = verify_game_file(game_file_id, user, db)
+
+
+
+def validate_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
+    
+    pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.poke_id == pokemon.poke_id).first()
+
+    if pokemon_data is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Pokemon not found in database!")
+    
     
 
+    
+    pokemon_to_db = models.OwnedPokemon(
+        game_file_id = game_file_id,
+        poke_id = pokemon_data.poke_id,
+        name = pokemon_data.name,
+        nickname = pokemon.nickname,
+        nature = pokemon.nature,
+        types = pokemon_data.types,
+        level = pokemon.level,
+        gender = pokemon.gender,
+        status = pokemon.status,
+        evolution_data = pokemon_data.evolution_data,
+        sprite = pokemon_data.sprite
+    )
+    
 
-# @router.get("/game-files/{game_file_id}/pokemon/party")
-# @router.get("/game-files/{game_file_id}/pokemon/storage")
-# @router.get("/game-files/{game_file_id}/pokemon/fainted")
-# @router.post("/game-files/{game_file_id}/pokemon")
+    
+
 # @router.put("/{pokemon_id}")
 # @router.post("/{pokemon_id}/evolve")
 # @router.post("/{pokemon_id}/swap")
