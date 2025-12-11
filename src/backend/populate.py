@@ -22,6 +22,7 @@ async def root():
 # initalize all pokemon in the database
 @app.post("/populate/pokemon")
 async def populate_pokemon(db: Session = Depends(database.get_db)):
+    print("t")
     index = 1
     while True:
         response = requests.get(f"https://pokeapi.co/api/v2/pokemon/{index}")
@@ -108,7 +109,7 @@ def evolution_parse(chain: dict, name: str):
                     data["evolution_data"].append({
                         "evolves_to": {
                             "species": evo["species"]["name"],
-                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"]}, {"trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
+                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"], "trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
                         }
                     })
         # stage 2 --> stage 3
@@ -117,7 +118,7 @@ def evolution_parse(chain: dict, name: str):
                     data["evolution_data"].append({
                         "evolves_to": {
                             "species": evo["species"]["name"],
-                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"]}, {"trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
+                            "evolution_details": [{"min_level": evo["evolution_details"][0]["min_level"], "trigger": {"name": evo["evolution_details"][0]["trigger"]["name"]}}]
                         }
                     })
     except Exception as e:

@@ -2,29 +2,15 @@
 Pokemon management router.
 Handles pokemon CRUD operations, evolution, and status management.
 """
-from sqlalchemy import Column
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from ...db import models
 from ..dependencies import get_db, get_current_user
-from ..schemas import PokemonResponse, PokemonCreate, PokemonBase, PokemonUpdate
+from ..schemas import PokemonResponse, PokemonCreate, PokemonUpdate
 
 router = APIRouter()
 
-### 2.4 Pokemon Management API
-# - Endpoints:
-#   - `GET /api/game-files/{game_file_id}/pokemon` – all pokemon, optional `status` filter.
-#   - `GET /api/game-files/{game_file_id}/pokemon/party` – party only.
-#   - `GET /api/game-files/{game_file_id}/pokemon/storage` – stored.
-#   - `GET /api/game-files/{game_file_id}/pokemon/fainted` – fainted.
-#   - `POST /api/game-files/{game_file_id}/pokemon` – add pokemon (create + party/storage decision).
-#   - `PUT /api/pokemon/{pokemon_id}` – edit level/nickname/status.
-#   - `POST /api/pokemon/{pokemon_id}/evolve` – perform evolution.
-#   - `POST /api/pokemon/{pokemon_id}/swap` – swap party/storage.
-#   - `GET /api/pokemon/all/{poke_id}` – lookup base pokemon info.
-#   - `GET /api/versions/{version_name}/starters` – list starters (handles Gen 5 special‑case like CLI `starter()`).
-# - Business rules reference:
-#   - `add_to_team`, `add_to_party_database`, `edit_pokemon`, `evolve`, `swap_pokemon` from `cli.py`.
+### Pokemon Management API
 
 def verify_game_file(game_file_id: int, user: models.User, db: Session) -> models.GameFiles:
 
@@ -101,11 +87,9 @@ async def create_pokemon(game_file_id: int, pokemon: PokemonCreate,
     user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)):
 
-    game_file = verify_game_file(game_file_id, user, db)
-    if game_file is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="game file cannot be found!")
-    else:
-        return add_pokemon(game_file_id, pokemon, db)
+    verify_game_file(game_file_id, user, db)
+
+    return add_pokemon(game_file_id, pokemon, db)
 
 
 
@@ -116,14 +100,14 @@ def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Pokemon not found in database!")
     
 
-    if pokemon.gender != "m" or pokemon.gender != "f":
+    if pokemon.gender != "m" and pokemon.gender != "f":
         pokemon.gender = None
     
 
     
     party_pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.game_file_id == game_file_id, models.OwnedPokemon.status == models.Status.PARTY).all()
 
-    if party_pokemon is not None and len(party_pokemon) >= 6 and pokemon.status == models.Status.PARTY:
+    if (len(party_pokemon) == 0 or len(party_pokemon) >= 6) and pokemon.status == models.Status.PARTY:
          pokemon.status = models.Status.UNKNOWN
 
     
@@ -147,17 +131,30 @@ def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
     
     return PokemonResponse.model_validate(pokemon_to_db)
 
+def perform_swap(partied_pokemon: models.OwnedPokemon, swap_pokemon: models.OwnedPokemon, db: Session):
+    """Helper function to swap two pokemon between party and storage."""
+    if partied_pokemon.status is not models.Status.PARTY:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pokemon to swap is not in party")
+    
+    partied_pokemon.status = models.Status.STORED  # type: ignore
+    swap_pokemon.status = models.Status.PARTY  # type: ignore
+    
+    db.commit()
+    db.refresh(partied_pokemon)
+    db.refresh(swap_pokemon)
+    
+    return {"message": "Successfully swapped!", "partied_pokemon": PokemonResponse.model_validate(partied_pokemon), "swap_pokemon": PokemonResponse.model_validate(swap_pokemon)}
+
     
 # edit level, nickname &/or status
-@router.put("{game_file_id}/pokemon/{id}")
+@router.put("/game-files/{game_file_id}/pokemon/{id}/update")
 async def update_pokemon(id: int, game_file_id: int, 
                          pokemon_update: PokemonUpdate,
                          user: models.User = Depends(get_current_user),
                          db: Session = Depends(get_db)):
     
-    game_file = verify_game_file(game_file_id, user, db)
-    if game_file is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="game file cannot be found!")
+    verify_game_file(game_file_id, user, db)
+    
     
     pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.id == id,
                                                    models.OwnedPokemon.game_file_id == game_file_id).first()
@@ -172,8 +169,28 @@ async def update_pokemon(id: int, game_file_id: int,
         pokemon.nickname = str(pokemon_update.nickname)  # type: ignore
 
     if pokemon_update.status is not None:
+        # Check if trying to set status to PARTY and party is already full
+        if pokemon_update.status == models.Status.PARTY:
+            party_pokemon = db.query(models.OwnedPokemon).filter(
+                models.OwnedPokemon.game_file_id == game_file_id,
+                models.OwnedPokemon.status == models.Status.PARTY
+            ).all()
+            
+            # If current pokemon is already in party, exclude it from count
+            party_count = len(party_pokemon)
+            if pokemon.status is models.Status.PARTY:
+                # Current pokemon is already counted in party_pokemon, so subtract 1
+                party_count -= 1
+            
+            if party_count >= 6:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Party is full (6 pokemon). Use the swap endpoint to replace a party member: POST /api/pokemon/game-files/{game_file_id}/pokemon_party/{{pokemon_party_id}}/pokemon/{id}/swap"
+                )
+        
         pokemon.status = pokemon_update.status  # type: ignore
-    
+
+
     db.commit()
     db.refresh(pokemon)
     
@@ -183,6 +200,91 @@ async def update_pokemon(id: int, game_file_id: int,
 
 
 
-# @router.post("/{pokemon_id}/evolve")
-# @router.post("/{pokemon_id}/swap")
+@router.post("/game-files/{game_file_id}/pokemon/{id}/evolve/{evolved_pokemon_name}")
+async def evolve_pokemon(id: int, evolved_pokemon_name: str, game_file_id: int, 
+                         user: models.User = Depends(get_current_user),
+                         db: Session = Depends(get_db)):
+        
+        verify_game_file(game_file_id, user, db)
 
+        pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.id == id,
+                                                   models.OwnedPokemon.game_file_id == game_file_id).first()
+        
+        if pokemon is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail ="id not found in database, or associated with user!")
+        
+        evolved_pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.name == evolved_pokemon_name).first()
+
+        if evolved_pokemon is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail ="Evolved pokemon not found in database! Please input correct name")
+
+    
+        evolution_data = pokemon.evolution_data
+
+        if evolution_data is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="pokemon does not have an evolution!")
+        
+        for evolution in evolution_data:
+            if evolution["evolves_to"]["species"] == evolved_pokemon_name.lower(): # type: ignore
+                evolution_details = evolution["evolves_to"]["evolution_details"]
+                for evo_detail in evolution_details:
+                    if evo_detail["min_level"] is not None and str(evo_detail["trigger"]["name"]) == "level-up": # type: ignore
+                        if pokemon.level >= evo_detail["min_level"]: # type: ignore
+                            return evolve(pokemon, evolved_pokemon, db)
+                        # throw error
+                        else:
+                            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pokemon hasn't reached the level requirement yet!")
+
+
+                    # evolve
+                    if evo_detail["min_level"] is None:
+                        return evolve(pokemon, evolved_pokemon, db)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evolution not found!")
+
+# TODO: update ability (if  abilities__contains__(ability) --> keep, else, ?)
+def evolve(current_pokemon: models.OwnedPokemon, evolved_pokemon: models.AllPokemon, db: Session):
+    
+    current_pokemon.name = evolved_pokemon.name
+    current_pokemon.poke_id = evolved_pokemon.poke_id
+    current_pokemon.types = evolved_pokemon.types
+    current_pokemon.evolution_data =evolved_pokemon.evolution_data
+    current_pokemon.sprite = evolved_pokemon.sprite
+
+    db.commit()
+    db.refresh(current_pokemon)
+
+    return PokemonResponse.model_validate(current_pokemon)
+
+    
+    
+
+
+
+        
+
+    
+@router.post("/game-files/{game_file_id}/pokemon_party/{pokemon_party_id}/pokemon/{pokemon_switch_id}/swap", status_code=status.HTTP_200_OK)
+async def swap_pokemon(pokemon_party_id: int, pokemon_switch_id: int, game_file_id: int, 
+                         user: models.User = Depends(get_current_user),
+                         db: Session = Depends(get_db)):
+    
+    verify_game_file(game_file_id, user, db)
+ 
+   
+    partied_pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.id == pokemon_party_id,
+                                                   models.OwnedPokemon.game_file_id == game_file_id).first()
+        
+    if partied_pokemon is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail ="id not found in database, or associated with user!")
+    
+    swap_pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.id == pokemon_switch_id,
+                                                   models.OwnedPokemon.game_file_id == game_file_id).first()
+        
+    if swap_pokemon is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail ="id not found in database, or associated with user!")
+
+    return perform_swap(partied_pokemon, swap_pokemon, db)
+
+
+
+    
