@@ -2,11 +2,12 @@
 Pokemon management router.
 Handles pokemon CRUD operations, evolution, and status management.
 """
+from sqlalchemy import Column
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from ...db import models
 from ..dependencies import get_db, get_current_user
-from ..schemas import PokemonResponse, PokemonCreate, PokemonBase
+from ..schemas import PokemonResponse, PokemonCreate, PokemonBase, PokemonUpdate
 
 router = APIRouter()
 
@@ -101,17 +102,29 @@ async def create_pokemon(game_file_id: int, pokemon: PokemonCreate,
     db: Session = Depends(get_db)):
 
     game_file = verify_game_file(game_file_id, user, db)
+    if game_file is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="game file cannot be found!")
+    else:
+        return add_pokemon(game_file_id, pokemon, db)
 
 
 
-def validate_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
-    
+def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
     pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.poke_id == pokemon.poke_id).first()
 
     if pokemon_data is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Pokemon not found in database!")
     
+
+    if pokemon.gender != "m" or pokemon.gender != "f":
+        pokemon.gender = None
     
+
+    
+    party_pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.game_file_id == game_file_id, models.OwnedPokemon.status == models.Status.PARTY).all()
+
+    if party_pokemon is not None and len(party_pokemon) >= 6 and pokemon.status == models.Status.PARTY:
+         pokemon.status = models.Status.UNKNOWN
 
     
     pokemon_to_db = models.OwnedPokemon(
@@ -127,11 +140,49 @@ def validate_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
         evolution_data = pokemon_data.evolution_data,
         sprite = pokemon_data.sprite
     )
+
+    db.add(pokemon_to_db)
+    db.commit()
+    db.refresh(pokemon_to_db)
     
+    return PokemonResponse.model_validate(pokemon_to_db)
 
     
+# edit level, nickname &/or status
+@router.put("{game_file_id}/pokemon/{id}")
+async def update_pokemon(id: int, game_file_id: int, 
+                         pokemon_update: PokemonUpdate,
+                         user: models.User = Depends(get_current_user),
+                         db: Session = Depends(get_db)):
+    
+    game_file = verify_game_file(game_file_id, user, db)
+    if game_file is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="game file cannot be found!")
+    
+    pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.id == id,
+                                                   models.OwnedPokemon.game_file_id == game_file_id).first()
+    
+    if pokemon is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail ="id not found in database, or associated with user!")
+    
+    if pokemon_update.level is not None:
+        pokemon.level = int(pokemon_update.level)  # type: ignore
+    
+    if pokemon_update.nickname is not None:
+        pokemon.nickname = str(pokemon_update.nickname)  # type: ignore
 
-# @router.put("/{pokemon_id}")
+    if pokemon_update.status is not None:
+        pokemon.status = pokemon_update.status  # type: ignore
+    
+    db.commit()
+    db.refresh(pokemon)
+    
+    return PokemonResponse.model_validate(pokemon)
+    
+    
+
+
+
 # @router.post("/{pokemon_id}/evolve")
 # @router.post("/{pokemon_id}/swap")
 

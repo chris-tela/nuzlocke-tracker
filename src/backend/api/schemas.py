@@ -4,7 +4,7 @@ These replace input() calls from CLI and provide JSON serialization.
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from ..db import models
 from ..db.models import Nature, Status
 
@@ -75,7 +75,44 @@ class PokemonCreate(BaseModel):
     ability: Optional[str] = None
     level: int = Field(ge=1, le=100)
     gender: Optional[str] = None
-    status: Status
+    status: Status = Status.UNKNOWN
+    
+    @field_validator('nature', mode='before')
+    @classmethod
+    def validate_nature(cls, v):
+        """Default invalid nature values to None instead of raising validation error."""
+        if v is None:
+            return None
+        # Try to convert string to Nature enum
+        if isinstance(v, str):
+            try:
+                return Nature(v)
+            except (ValueError, KeyError):
+                return None
+        # If it's already a Nature enum, return it
+        if isinstance(v, Nature):
+            return v
+        # For any other invalid type, default to None
+        return None
+    
+    @field_validator('status', mode='before')
+    @classmethod
+    def validate_status(cls, v):
+        """Default invalid status values to UNKNOWN instead of raising validation error."""
+        if v is None:
+            return Status.UNKNOWN
+        # Try to convert string to Status enum
+        if isinstance(v, str):
+            try:
+                return Status(v)
+            except (ValueError, KeyError):
+                return Status.UNKNOWN
+        # If it's already a Status enum, return it
+        if isinstance(v, Status):
+            return v
+        # For any other invalid type, default to UNKNOWN
+        return Status.UNKNOWN
+
 class PokemonUpdate(BaseModel):
     level: Optional[int] = Field(None, ge=1, le=100)
     nickname: Optional[str] = None
