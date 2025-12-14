@@ -239,6 +239,7 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
         except Exception as e:
             continue
         try:
+            print(loc_lower)
             route_encounter = models.Route(
                 name = loc_lower,
                 version_id = version.version_id,

@@ -4,6 +4,7 @@ Handles pokemon CRUD operations, evolution, and status management.
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from ..utils import verify_game_file
 from ...db import models
 from ..dependencies import get_db, get_current_user
 from ..schemas import PokemonResponse, PokemonCreate, PokemonUpdate
@@ -12,17 +13,7 @@ router = APIRouter()
 
 ### Pokemon Management API
 
-def verify_game_file(game_file_id: int, user: models.User, db: Session) -> models.GameFiles:
 
-    game_file = db.query(models.GameFiles).filter(models.GameFiles.id == game_file_id).first()
-
-    if game_file is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Game File not found!")
-    
-    if game_file.user_id is not user.id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Game File not associated with User!")
-    
-    return game_file
 
 
 @router.get("/game-files/{game_file_id}/pokemon", response_model=list[PokemonResponse])
@@ -285,6 +276,72 @@ async def swap_pokemon(pokemon_party_id: int, pokemon_switch_id: int, game_file_
 
     return perform_swap(partied_pokemon, swap_pokemon, db)
 
+
+@router.get("/{poke_id}")
+async def get_pokemon_info(
+    poke_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get base pokemon information by poke_id."""
+    pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.poke_id == poke_id).first()
+    
+    if pokemon is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pokemon with poke_id {poke_id} not found in database!"
+        )
+    
+    return {
+        "poke_id": pokemon.poke_id,
+        "name": pokemon.name,
+        "types": pokemon.types,
+        "abilities": pokemon.abilities,
+        "weight": pokemon.weight,
+        "base_hp": pokemon.base_hp,
+        "base_attack": pokemon.base_attack,
+        "base_defense": pokemon.base_defense,
+        "base_special_attack": pokemon.base_special_attack,
+        "base_special_defense": pokemon.base_special_defense,
+        "base_speed": pokemon.base_speed,
+        "evolution_data": pokemon.evolution_data,
+        "sprite": pokemon.sprite
+    }
+
+
+@router.get("/versions/{version_name}/starters")
+async def get_starters(
+    version_name: str,
+    db: Session = Depends(get_db)
+):
+    """Get starter pokemon list for a version. Handles Gen 5 special case."""
+    version = db.query(models.Version).filter(models.Version.version_name == version_name).first()
+    
+    if version is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version '{version_name}' not found in database!"
+        )
+    
+    gen = db.query(models.Generation).filter(
+        models.Generation.generation_id == version.generation_id
+    ).first()
+    
+    if gen is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Generation for version '{version_name}' not found!"
+        )
+    
+    pokedex = gen.pokemon
+    
+    # Gen 5 pokedex starts with victini, which breaks the pattern
+    generation_id = getattr(gen, 'generation_id', None)
+    if generation_id == 5:
+        starters = pokedex[1:4]  # Skip index 0 (Victini), get next 3
+    else:
+        starters = pokedex[0:3]  # First 3 pokemon are starters
+    
+    return {"starters": starters}
 
 
     

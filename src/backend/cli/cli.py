@@ -265,6 +265,8 @@ def game_choice() -> str:
                 break
             case "white-2":
                 break
+            case "diamond":
+                break
             case "red":
                 break
             case _:

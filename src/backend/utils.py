@@ -227,7 +227,7 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                     return sea_encounters
             except Exception as e:
                     raise Exception("Location contains no encounters")
-            return
+            
         try:
             return get_location(route, region_name, version_name)
         except Exception as e:
@@ -265,16 +265,17 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
 function is used when a location has multiple areas, all containing encounters that need to be condensed into a single area that isn't in the location-area api
 used as a 'helper' for get_encounters
 '''
-def get_location(location: str, region: str,  version: str) -> list[list]:
-    location = requests.get(f"https://pokeapi.co/api/v2/location/{location.lower()}").json()
+def get_location(loc: str, region: str,  version: str) -> list[list]:
+    location = requests.get(f"https://pokeapi.co/api/v2/location/{loc.lower()}").json()
     try:
         areas = location["areas"]
-    except areas is None:
-        raise Exception("Location contains no areas")
+    except Exception as e:
+        raise Exception("Location contains no areas: " + str(e))
     
     if len(areas) <= 1:
         raise Exception("Location contains one or none areas, and does not need to be condensed")
     
+
 
     areas_encounters = []
     for area in areas:
@@ -318,6 +319,7 @@ def get_location(location: str, region: str,  version: str) -> list[list]:
                         condensed_encounters.pop(z)
                         condensed_encounters.append([pokemon, min_level, max_level, version, region])
                         break
+
     return condensed_encounters
 
 
