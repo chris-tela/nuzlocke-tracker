@@ -255,6 +255,162 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
     return {"message": "Route encounters populated successfully"}
 
 
+@app.post("/populate/gyms")
+def populate_gyms(db: Session = Depends(database.get_db)):
+    """Populate gym table from trainer_data JSON files."""
+    import os
+    
+    # Get all versions from database
+    versions = db.query(models.Version).all()
+    
+    if not versions:
+        raise HTTPException(status_code=404, detail="No versions found in database. Please populate versions first.")
+    
+    trainer_data_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "backend",
+        "scrape",
+        "trainer_data"
+    )
+    
+    # Map to track which files we've processed
+    processed_files = {}
+    
+    for version in versions:
+        # Get trainer data filename for this version
+        game_name = version.version_name
+        
+        # Special case for black-2 and white-2
+        if game_name in ['black-2', 'white-2']:
+            filename = 'black-white-2_trainers.json'
+        else:
+            # Try to get from version_groups
+            gen = db.query(models.Generation).filter(
+                models.Generation.generation_id == version.generation_id
+            ).first()
+            
+            version_groups_value = getattr(gen, 'version_groups', None) if gen else None
+            if gen and version_groups_value:
+                version_groups = list(version_groups_value) if version_groups_value else []
+                filename = None
+                
+                # Try to find matching version group filename
+                for vg in version_groups:
+                    potential_filename = f'{vg}_trainers.json'
+                    file_path = os.path.join(trainer_data_dir, potential_filename)
+                    if os.path.exists(file_path):
+                        filename = potential_filename
+                        break
+                
+                # Fallback to game_name format
+                if not filename:
+                    filename = f'{game_name}_trainers.json'
+            else:
+                filename = f'{game_name}_trainers.json'
+        
+        # Skip if we've already processed this file for another version
+        if filename in processed_files:
+            # Use the same gym data but create entries for this version
+            gym_data = processed_files[filename]
+            for gym_entry in gym_data:
+                # Check if gym already exists for this game_name
+                existing = db.query(models.Gym).filter(
+                    models.Gym.game_name == game_name,
+                    models.Gym.gym_number == gym_entry['gym_number']
+                ).first()
+                
+                if not existing:
+                    gym = models.Gym(
+                        game_name=game_name,
+                        gym_number=gym_entry['gym_number'],
+                        location=gym_entry['location'],
+                        trainer_name=gym_entry['trainer_name'],
+                        trainer_image=gym_entry['trainer_image'],
+                        badge_name=gym_entry['badge_name'],
+                        badge_type=gym_entry['badge_type'],
+                        pokemon=gym_entry['pokemon']
+                    )
+                    db.add(gym)
+            continue
+        
+        # Load trainer data file
+        file_path = os.path.join(trainer_data_dir, filename)
+        
+        if not os.path.exists(file_path):
+            print(f"Warning: Trainer data file not found: {file_path}")
+            raise HTTPException(status_code=404, detail="Trainer data not found: {file_path}")
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                all_trainers = json.load(f)
+        except Exception as e:
+            print(f"Error loading {filename}: {e}")
+            continue
+        
+        # Filter for gyms only (exclude Elite Four and Champion)
+        gym_trainers = [
+            trainer for trainer in all_trainers 
+            if trainer.get('location') not in ['Elite Four', 'Champion'] 
+            and trainer.get('gym_number') 
+            and trainer.get('gym_number') != ''
+        ]
+        
+        # Group by gym_number and create gym entries
+        gyms_by_number = {}
+        for trainer in gym_trainers:
+            gym_num = int(trainer.get('gym_number'))
+            
+            if gym_num not in gyms_by_number:
+                # First trainer for this gym - use their data
+                gyms_by_number[gym_num] = {
+                    'gym_number': gym_num,
+                    'location': trainer.get('location', ''),
+                    'trainer_name': trainer.get('trainer_name', ''),
+                    'trainer_image': trainer.get('trainer_image', ''),
+                    'badge_name': trainer.get('badge_name', ''),
+                    'badge_type': trainer.get('badge_type', ''),
+                    'pokemon': trainer.get('pokemon', [])
+                }
+            else:
+                # Additional trainer for this gym - combine pokemon
+                existing_pokemon = gyms_by_number[gym_num]['pokemon']
+                new_pokemon = trainer.get('pokemon', [])
+                # Add pokemon that aren't already in the list
+                for poke in new_pokemon:
+                    if poke not in existing_pokemon:
+                        existing_pokemon.append(poke)
+        
+        # Store processed file data
+        processed_files[filename] = list(gyms_by_number.values())
+        
+        # Create Gym entries for this version
+        for gym_entry in gyms_by_number.values():
+            # Check if gym already exists
+            existing = db.query(models.Gym).filter(
+                models.Gym.game_name == game_name,
+                models.Gym.gym_number == gym_entry['gym_number']
+            ).first()
+            
+            if existing:
+                continue  # Skip if already exists
+            
+            gym = models.Gym(
+                game_name=game_name,
+                gym_number=gym_entry['gym_number'],
+                location=gym_entry['location'],
+                trainer_name=gym_entry['trainer_name'],
+                trainer_image=gym_entry['trainer_image'],
+                badge_name=gym_entry['badge_name'],
+                badge_type=gym_entry['badge_type'],
+                pokemon=gym_entry['pokemon']
+            )
+            db.add(gym)
+    
+    db.commit()
+    db.close()
+    return {"message": "Gyms populated successfully"}
+
+
 
         
 

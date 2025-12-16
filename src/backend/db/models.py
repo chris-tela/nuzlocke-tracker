@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Boolean, ARRAY, JSON, Enum
+from sqlalchemy import Column, Integer, String, Boolean, ARRAY, JSON, Enum, true
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.sqltypes import TIMESTAMP
@@ -151,5 +151,20 @@ class Route(Base):
 
     generation = relationship("Generation", back_populates="route")
     version = relationship("Version", back_populates="route")
+
+
+# derived from trainer_data.json
+class Gym(Base):
+    __tablename__ = "gym"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_name = Column(String, nullable=False)
+    gym_number = Column(Integer, nullable=True)
+    location = Column(String, nullable=False)
+    trainer_name = Column(String, nullable=True)
+    trainer_image = Column(String, nullable=False)
+    badge_name =  Column(String, nullable=True)
+    badge_type = Column(String, nullable=True)
+    pokemon = Column(JSON, nullable=False)
 
 
