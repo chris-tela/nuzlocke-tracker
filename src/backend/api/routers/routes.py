@@ -3,24 +3,16 @@ Route/encounter management router.
 Handles route progression and encounter data.
 """
 from fastapi import APIRouter, HTTPException, Depends, status
-from h11 import Data
 from sqlalchemy.orm import Session
 from ..utils import verify_game_file
 from ...db import models
 from ..dependencies import get_db, get_current_user
+from ..schemas import PokemonCreate
+from .pokemon import add_pokemon as add_pokemon_to_game
 
 
 router = APIRouter()
 
-### 2.5 Route / Encounter API
-# - Endpoints:
-#   - `GET /api/versions/{version_name}/routes` – ordered route list (from `Version.locations_ordered`).
-#   - `GET /api/routes/{route_name}` – encounter data for a route (from `Route.data`).
-#   - `GET /api/game-files/{game_file_id}/route-progress` – current route progression.
-#   - `GET /api/game-files/{game_file_id}/upcoming-routes` – derive from version’s ordered list minus discovered routes.
-#   - `POST /api/game-files/{game_file_id}/route-progress` – confirm/viewed/completed route (like `confirm_location_view`).
-#   - `POST /api/game-files/{game_file_id}/catch-pokemon` – catch from route (tying into Pokemon endpoints).
-# - Reference CLI functions: `encounters`, `find_route_progress`, `find_upcoming_locations`, `view_location`, `confirm_location_view`.
 
 # find version through game file
 @router.get("/game-files/{game_file_id}/routes", status_code=200)
@@ -129,11 +121,71 @@ async def add_route(game_file_id: int, route: str, user: models.User = Depends(g
     return {"message": f"Route '{route}' added to progress", "route_progress": route_progress}
 
 
-#redirect route from add_pokemon
-@router.post("/game-files/{game_file_id}/route-pokemon/{route}", status_code=201)
-async def add_pokemon(game_file_id: int, route: str):
-    # add pokemonCreate schema
-    # if body is empty --> add route with no pokemon added
-    # if body is filled --> identify pokemon to add by id
-    # things like level min max & ability --> handled by frontend
-    pass
+
+# used in unision with add_route
+# TODO: function should work in unision from add_route
+# ex if a user adds a route with pokemon, then they'll have the option to add pokemon from route
+# if we want to check route_progress do we assume route has already been added or that it hasnt?
+# OR does adding a pokemon from route also adds the route
+@router.post("/game-files/{game_file_id}/route-pokemon/{route_name}", status_code=201)
+async def add_pokemon_from_route(
+    game_file_id: int,
+    route_name: str,
+    pokemon: PokemonCreate,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Add a pokemon that was encountered on a specific route.
+    Validates that the pokemon exists in that route's encounter data,
+    then delegates creation to the pokemon router logic.
+    """
+    # Verify game file belongs to user
+    game_file = verify_game_file(game_file_id, user, db)
+
+    version = db.query(models.Version).filter(models.Version.version_name == game_file.game_name).first()
+
+    if version is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Version not found for this game.",
+        )
+
+    # Look up route by id
+    route = (
+        db.query(models.Route)
+        .filter(models.Route.name == route_name.lower(), models.Route.version_id == version.version_id)
+        .first()
+    )
+
+    if route is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Route not found for this game.",
+        )
+
+    # Look up full pokemon data
+    full_data_pokemon = (
+        db.query(models.AllPokemon)
+        .filter(models.AllPokemon.poke_id == pokemon.poke_id)
+        .first()
+    )
+
+    if full_data_pokemon is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Error finding pokemon details! Ensure poke_id is accurate.",
+        )
+
+    # Ensure this pokemon can actually be encountered on this route
+    # route.data entries look like: [pokemon_name, min_level, max_level, region, ...]
+    route_data_value = getattr(route, "data", None)
+    encounter_names = {enc[0] for enc in (route_data_value or [])}
+    if full_data_pokemon.name not in encounter_names:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pokemon '{full_data_pokemon.name}' is not an encounter on this route.",
+        )
+
+    # Delegate creation to pokemon router logic
+    return add_pokemon_to_game(game_file_id, pokemon, db)
