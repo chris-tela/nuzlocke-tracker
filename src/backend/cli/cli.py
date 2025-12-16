@@ -663,15 +663,12 @@ def confirm_location_view(location_name: str):
         route_progress_value = getattr(game_file, 'route_progress', None)
         route_progress = list(route_progress_value) if route_progress_value is not None else []
         
-        # Add location_name if not already present
-        if location_name not in route_progress:
-            route_progress.append(location_name)
-            # Update route_progress (SQLAlchemy handles the type conversion)
-            setattr(game_file, 'route_progress', route_progress)
-            db.commit()
-            print(f"{location_name} added to route progression!")
-        else:
-            print(f"{location_name} is already in route progression.")
+        route_progress.append(location_name)
+        # Update route_progress (SQLAlchemy handles the type conversion)
+        setattr(game_file, 'route_progress', route_progress)
+        db.commit()
+        print(f"{location_name} added to route progression!")
+
         
         # Update the global current_game_file to reflect changes
         db.refresh(game_file)

@@ -63,12 +63,8 @@ async def get_route_progress(game_file_id: int, user: models.User = Depends(get_
 
     return {"routes_discovered": game_file.route_progress}
 
-@router.get("/game-files/{game_file_id}/upcoming_routes")
-async def get_upcoming_routes(game_file_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Get upcoming routes by finding the difference between ordered locations and route progress."""
-    
-    game_file = verify_game_file(game_file_id, user, db)
-
+def get_upcoming_routes_list(game_file: models.GameFiles, db: Session) -> list[str]:
+    """Helper function to get upcoming routes list."""
     version = db.query(models.Version).filter(models.Version.version_name == game_file.game_name).first()
 
     if version is None:
@@ -92,5 +88,52 @@ async def get_upcoming_routes(game_file_id: int, user: models.User = Depends(get
         if route in upcoming_routes:
             upcoming_routes.remove(route)
     
+    return upcoming_routes
+
+@router.get("/game-files/{game_file_id}/upcoming_routes")
+async def get_upcoming_routes(game_file_id: int, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get upcoming routes by finding the difference between ordered locations and route progress."""
+    
+    game_file = verify_game_file(game_file_id, user, db)
+    upcoming_routes = get_upcoming_routes_list(game_file, db)
+    
     return {"upcoming_routes": upcoming_routes}
 
+# confirm route has been 'complete'
+@router.post("/game-files/{game_file_id}/route-progressed/{route}", status_code=201)
+async def add_route(game_file_id: int, route: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Add a route to route_progress only if it's in upcoming_routes."""
+    
+    game_file = verify_game_file(game_file_id, user, db)
+
+    # 1. get upcoming routes
+    upcoming_routes = get_upcoming_routes_list(game_file, db)
+
+    # 2. evaluate whether route is in upcoming_routes
+    if route not in upcoming_routes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Route '{route}' is not in upcoming routes. Cannot add duplicate or invalid route."
+        )
+    
+    # Get current route_progress
+    route_progress_value = getattr(game_file, 'route_progress', None)
+    route_progress = list(route_progress_value) if route_progress_value is not None else []
+    
+    # Add route (it's already validated to be in upcoming_routes, so it won't be a duplicate)
+    route_progress.append(route)
+    setattr(game_file, 'route_progress', route_progress)
+    db.commit()
+    db.refresh(game_file)
+    
+    return {"message": f"Route '{route}' added to progress", "route_progress": route_progress}
+
+
+#redirect route from add_pokemon
+@router.post("/game-files/{game_file_id}/route-pokemon/{route}", status_code=201)
+async def add_pokemon(game_file_id: int, route: str):
+    # add pokemonCreate schema
+    # if body is empty --> add route with no pokemon added
+    # if body is filled --> identify pokemon to add by id
+    # things like level min max & ability --> handled by frontend
+    pass
