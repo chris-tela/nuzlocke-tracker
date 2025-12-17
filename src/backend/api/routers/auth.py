@@ -4,7 +4,7 @@ Handles both JWT (username/password) and Google OAuth login flows.
 """
 import secrets
 from typing import Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote_plus
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.responses import RedirectResponse
@@ -21,7 +21,8 @@ router = APIRouter()
 
 
 # In-memory state storage (use Redis/cache in production)
-oauth_states: dict[str, datetime] = {}
+# Format: {state: {"timestamp": datetime, "mode": "login" | "register"}}
+oauth_states: dict[str, dict] = {}
 
 def create_access_token(user_id: int) -> str:
     """Create a JWT access token for the user."""
@@ -249,17 +250,30 @@ async def logout():
 
 # Google OAuth Endpoints
 @router.get("/google/login")
-async def login_google():
-    """Initiate Google OAuth login flow."""
+async def login_google(mode: Optional[str] = "register"):
+    """Initiate Google OAuth login flow.
+    
+    Args:
+        mode: "login" or "register". Defaults to "register".
+              If "login", will error if user doesn't exist.
+              If "register", will create user if doesn't exist.
+    """
     if not config.GOOGLE_CLIENT_ID:
         raise HTTPException(
             status_code=500,
             detail="Google OAuth not configured. Please set GOOGLE_CLIENT_ID."
         )
     
+    # Validate mode
+    if mode not in ["login", "register"]:
+        mode = "register"
+    
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
-    oauth_states[state] = datetime.utcnow()
+    oauth_states[state] = {
+        "timestamp": datetime.utcnow(),
+        "mode": mode
+    }
     
     # Build the Google login URL with proper URL encoding
     params = {
@@ -275,7 +289,9 @@ async def login_google():
     
     return {"url": auth_url}
 
+# Handle both callback paths for compatibility
 @router.get("/google/callback")
+@router.get("/callback/google")  # Alternative path for backwards compatibility
 async def google_callback(
     code: Optional[str] = None,
     state: Optional[str] = None,
@@ -292,8 +308,13 @@ async def google_callback(
     if state not in oauth_states:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     
+    # Get mode and timestamp from state
+    state_data = oauth_states[state]
+    mode = state_data.get("mode", "register")
+    state_timestamp = state_data.get("timestamp")
+    
     # Check state hasn't expired (5 minutes)
-    if datetime.utcnow() - oauth_states[state] > timedelta(minutes=5):
+    if state_timestamp and datetime.utcnow() - state_timestamp > timedelta(minutes=5):
         del oauth_states[state]
         raise HTTPException(status_code=400, detail="State parameter expired")
     
@@ -305,15 +326,48 @@ async def google_callback(
         result = google.get_user_infos_from_google_token_url(code)
         
         if not result.get('status') or not result.get('user_infos'):
-            raise HTTPException(
-                status_code=400,
-                detail="Failed to get user information from Google"
-            )
+            frontend_url = config.FRONTEND_URL
+            error_msg = "Failed to get user information from Google"
+            redirect_url = f"{frontend_url}/auth/callback?error={quote_plus(error_msg)}"
+            return RedirectResponse(url=redirect_url)
         
         google_user_info = result['user_infos']
+        email = google_user_info.get("email", "")
+        google_id = str(google_user_info.get("id", ""))
+        
+        # Check if user exists
+        existing_user = None
+        if google_id:
+            existing_user = db.query(models.User).filter(
+                models.User.oauth_provider == "google",
+                models.User.oauth_provider_id == google_id
+            ).first()
+        
+        if not existing_user and email:
+            existing_user = db.query(models.User).filter(models.User.email == email).first()
+        
+        # If in login mode and user doesn't exist, redirect with error
+        if mode == "login" and not existing_user:
+            frontend_url = config.FRONTEND_URL
+            error_msg = "Account not found. Please use Register to create an account with this email."
+            redirect_url = f"{frontend_url}/auth/callback?error={quote_plus(error_msg)}"
+            return RedirectResponse(url=redirect_url)
         
         # Get or create user in database
-        user = get_or_create_user(db, google_user_info)
+        # If user exists, use it; otherwise create (only happens in register mode)
+        if existing_user:
+            user = existing_user
+            # Update OAuth metadata if missing
+            if not getattr(user, 'oauth_provider', None):
+                setattr(user, 'oauth_provider', "google")
+                setattr(user, 'oauth_provider_id', google_id if google_id else None)
+                if email and not getattr(user, 'email', None):
+                    setattr(user, 'email', email)
+                db.commit()
+                db.refresh(user)
+        else:
+            # Only create if in register mode (login mode would have errored above)
+            user = get_or_create_user(db, google_user_info)
         
         # Generate JWT token
         access_token = create_access_token(int(user.id))  # type: ignore
@@ -324,13 +378,18 @@ async def google_callback(
         
         return RedirectResponse(url=redirect_url)
         
-    except HTTPException:
-        raise
+    except HTTPException as e:
+        # Redirect to frontend with error message
+        frontend_url = config.FRONTEND_URL
+        error_msg = e.detail if hasattr(e, 'detail') else "Authentication failed"
+        redirect_url = f"{frontend_url}/auth/callback?error={quote_plus(error_msg)}"
+        return RedirectResponse(url=redirect_url)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Authentication failed: {str(e)}"
-        )
+        # Redirect to frontend with error message
+        frontend_url = config.FRONTEND_URL
+        error_msg = f"Authentication failed: {str(e)}"
+        redirect_url = f"{frontend_url}/auth/callback?error={quote_plus(error_msg)}"
+        return RedirectResponse(url=redirect_url)
 
 @router.get("/me")
 async def get_me(user: models.User = Depends(get_current_user)):
