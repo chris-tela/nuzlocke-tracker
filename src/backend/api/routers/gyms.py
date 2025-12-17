@@ -13,16 +13,6 @@ from sqlalchemy import asc # ascending
 router = APIRouter()
 
 
-### 2.6 Gym Management API
-# - Endpoints:
-#   - `GET /api/game-files/{game_file_id}/gym-progress` – completed gyms.
-#   - `GET /api/game-files/{game_file_id}/upcoming-gyms` – derive from trainer JSON and completed gyms.
-#   - `POST /api/game-files/{game_file_id}/gym-progress` – mark next gym as completed (enforce linear order).
-#   - `GET /api/versions/{version_name}/gyms` – list gyms (1–8).
-#   - `GET /api/versions/{version_name}/gyms/{gym_number}` – full details (trainers, teams).
-# - Reference CLI: `gym_encounters`, `display_gym_trainers`, `update_gym_progress`, `get_trainer_data_filename`.
-
-
 
 @router.get("/game-files/{game_file_id}/gym-progress")
 async def get_gym_progress(game_file_id: int, user: models.User = Depends(get_current_user),  db: Session = Depends(get_db)):
@@ -108,7 +98,6 @@ async def add_gym(game_file_id: int, gym_number: int, user: models.User = Depend
 @router.get("/version/{version_name}/gyms")
 async def get_version_gyms(version_name: str, db: Session = Depends(get_db)):
     
-    print("test")
     version = db.query(models.Version).filter(models.Version.version_name == version_name).first()
 
     if version is None:

@@ -141,7 +141,7 @@ async def update_current_user_profile(
                                                       models.User.id != user.id).first()
         
         if existing_email:
-            raise HTTPException(status_code=409, detail="Username is taken!")
+            raise HTTPException(status_code=409, detail="Email is taken!")
         
         user.email = new_email # type: ignore 
     
@@ -160,7 +160,7 @@ async def update_current_user_profile(
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """Register a new user with username and password."""
-    # Check if username already exists
+    # Check if username  exists
     existing_user = db.query(models.User).filter(models.User.username == user_data.username).first()
     if existing_user:
         raise HTTPException(
