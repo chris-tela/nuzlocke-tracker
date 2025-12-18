@@ -327,7 +327,7 @@ export const TeamPage = () => {
         </h1>
         <button
           className="btn btn-outline"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(`/dashboard?gameFileId=${gameFileId}`)}
           style={{ fontSize: '0.9rem', padding: '8px 16px' }}
         >
           {'<-'} Back to Dashboard

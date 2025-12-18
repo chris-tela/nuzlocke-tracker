@@ -82,8 +82,14 @@ export const DashboardPage = () => {
 
   useEffect(() => {
     // If there is no selected game file, send the user back to game file selection
+    // The GameFileContext will try to load from URL, so give it a moment
     if (!currentGameFile) {
-      navigate('/game-files');
+      // Check if gameFileId is in URL - if so, wait a bit for context to load it
+      const urlParams = new URLSearchParams(window.location.search);
+      const gameFileIdFromUrl = urlParams.get('gameFileId');
+      if (!gameFileIdFromUrl) {
+        navigate('/game-files');
+      }
     }
   }, [currentGameFile, navigate]);
 
@@ -203,7 +209,7 @@ export const DashboardPage = () => {
               {/* Next Routes button */}
               <button
                 type="button"
-                onClick={() => navigate('/routes')}
+                onClick={() => navigate(`/routes?gameFileId=${gameFileId}`)}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -217,20 +223,36 @@ export const DashboardPage = () => {
                   flexDirection: 'column',
                   gap: '2px',
                   fontSize: '0.9rem',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-pokemon-primary)';
+                  e.currentTarget.style.borderColor = 'var(--color-pokemon-primary)';
+                  e.currentTarget.style.color = 'white';
+                  const spans = e.currentTarget.querySelectorAll('span');
+                  spans.forEach((span) => {
+                    (span as HTMLElement).style.color = 'rgba(255, 255, 255, 0.95)';
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-light)';
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                  const spans = e.currentTarget.querySelectorAll('span');
+                  spans[0].style.color = '';
+                  (spans[1] as HTMLElement).style.color = 'var(--color-text-secondary)';
                 }}
               >
                 <span style={{ fontWeight: 600 }}>Next Routes</span>
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                  {nextRoute
-                    ? nextRoute.route_name || nextRoute.location_name || 'Next route available'
-                    : 'No upcoming routes'}
+                  View upcoming routes & encounters
                 </span>
               </button>
 
               {/* Next Gyms button */}
               <button
                 type="button"
-                onClick={() => navigate('/gyms')}
+                onClick={() => navigate(`/gyms?gameFileId=${gameFileId}`)}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -244,12 +266,30 @@ export const DashboardPage = () => {
                   flexDirection: 'column',
                   gap: '2px',
                   fontSize: '0.9rem',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-pokemon-primary)';
+                  e.currentTarget.style.borderColor = 'var(--color-pokemon-primary)';
+                  e.currentTarget.style.color = 'white';
+                  const spans = e.currentTarget.querySelectorAll('span');
+                  spans.forEach((span) => {
+                    (span as HTMLElement).style.color = 'rgba(255, 255, 255, 0.95)';
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-light)';
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                  const spans = e.currentTarget.querySelectorAll('span');
+                  spans[0].style.color = '';
+                  (spans[1] as HTMLElement).style.color = 'var(--color-text-secondary)';
                 }}
               >
                 <span style={{ fontWeight: 600 }}>Next Gyms</span>
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
                   {nextGym
-                    ? `Gym ${nextGym.gym_number} - ${nextGym.gym_leader || 'Next Gym'}`
+                    ? `Gym ${nextGym.gym_number} - ${nextGym.trainer_name || 'Next Gym'}`
                     : 'No upcoming gyms'}
                 </span>
               </button>
@@ -330,7 +370,7 @@ export const DashboardPage = () => {
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => navigate('/team')}
+            onClick={() => navigate(`/team?gameFileId=${gameFileId}`)}
             style={{ fontSize: '0.8rem', padding: '6px 12px' }}
           >
             Manage Team

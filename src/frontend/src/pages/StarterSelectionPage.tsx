@@ -98,7 +98,7 @@ export const StarterSelectionPage = () => {
       });
 
       // Navigate to dashboard after successful starter selection (per Phase 4.3)
-      navigate('/dashboard');
+      navigate(`/dashboard?gameFileId=${gameFileId}`, { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to add starter Pokemon');
     } finally {

@@ -11,6 +11,7 @@ import { StarterSelectionPage } from './pages/StarterSelectionPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamPage } from './pages/TeamPage';
 import { RoutesPage } from './pages/RoutesPage';
+import { GymsPage } from './pages/GymsPage';
 import './App.css';
 
 // Protected Route Component
@@ -89,6 +90,14 @@ function App() {
           element={
             <ProtectedRoute>
               <RoutesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gyms"
+          element={
+            <ProtectedRoute>
+              <GymsPage />
             </ProtectedRoute>
           }
         />

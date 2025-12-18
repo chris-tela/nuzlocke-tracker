@@ -18,8 +18,8 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
     return (
       <div
         style={{
-          width: '64px',
-          height: '64px',
+          width: '96px',
+          height: '96px',
           borderRadius: '8px',
           backgroundColor: 'var(--color-bg-light)',
           display: 'flex',
@@ -38,8 +38,8 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
     return (
       <div
         style={{
-          width: '64px',
-          height: '64px',
+          width: '96px',
+          height: '96px',
           borderRadius: '8px',
           backgroundColor: 'var(--color-bg-light)',
           display: 'flex',
@@ -57,8 +57,8 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
   return (
     <div
       style={{
-        width: '64px',
-        height: '64px',
+        width: '96px',
+        height: '96px',
         borderRadius: '8px',
         backgroundColor: 'var(--color-bg-light)',
         display: 'flex',
@@ -80,6 +80,109 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
           e.currentTarget.style.display = 'none';
         }}
       />
+    </div>
+  );
+};
+
+// Component for individual encounter card with types
+const EncounterCard = ({
+  encounter,
+  isClickable,
+  onLogEncounterWithPokemon,
+}: {
+  encounter: { pokemon: string; minLevel: number; maxLevel: number; methods?: string[] };
+  isClickable: boolean;
+  onLogEncounterWithPokemon: (pokemonName: string) => void;
+}) => {
+  const { data: pokemonInfo } = usePokemonInfoByName(encounter.pokemon.toLowerCase());
+
+  return (
+    <div
+      onClick={() => {
+        if (isClickable) {
+          onLogEncounterWithPokemon(encounter.pokemon);
+        }
+      }}
+      style={{
+        padding: '16px',
+        borderRadius: '12px',
+        border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg-card)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '8px',
+        cursor: isClickable ? 'pointer' : 'default',
+        transition: isClickable ? 'all 150ms ease' : 'none',
+      }}
+      onMouseEnter={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.borderColor = 'var(--color-pokemon-primary)';
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-light)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (isClickable) {
+          e.currentTarget.style.borderColor = 'var(--color-border)';
+          e.currentTarget.style.backgroundColor = 'var(--color-bg-card)';
+        }
+      }}
+    >
+      <PokemonSprite pokemonName={encounter.pokemon} />
+      <div
+        style={{
+          textAlign: 'center',
+          width: '100%',
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            textTransform: 'capitalize',
+            marginBottom: '4px',
+          }}
+        >
+          {encounter.pokemon}
+        </div>
+        {pokemonInfo?.types && pokemonInfo.types.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              gap: '6px',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              marginBottom: '6px',
+            }}
+          >
+            {pokemonInfo.types.map((type) => (
+              <PokemonTypeBadge key={type} type={type} />
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            fontSize: '0.85rem',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
+          Lv. {encounter.minLevel}
+          {encounter.maxLevel !== encounter.minLevel
+            ? `-${encounter.maxLevel}`
+            : ''}
+        </div>
+        {encounter.methods && Array.isArray(encounter.methods) && encounter.methods.length > 0 && (
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: 'var(--color-text-secondary)',
+              marginTop: '4px',
+            }}
+          >
+            {encounter.methods.join(', ')}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -154,79 +257,12 @@ const RouteCard = ({
             {encounters.map((encounter, index) => {
               const isClickable = !isEncountered && encounters.length > 0;
               return (
-                <div
+                <EncounterCard
                   key={index}
-                  onClick={() => {
-                    if (isClickable) {
-                      onLogEncounterWithPokemon(encounter.pokemon);
-                    }
-                  }}
-                  style={{
-                    padding: '16px',
-                    borderRadius: '12px',
-                    border: '1px solid var(--color-border)',
-                    backgroundColor: 'var(--color-bg-card)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px',
-                    cursor: isClickable ? 'pointer' : 'default',
-                    transition: isClickable ? 'all 150ms ease' : 'none',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isClickable) {
-                      e.currentTarget.style.borderColor = 'var(--color-pokemon-primary)';
-                      e.currentTarget.style.backgroundColor = 'var(--color-bg-light)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (isClickable) {
-                      e.currentTarget.style.borderColor = 'var(--color-border)';
-                      e.currentTarget.style.backgroundColor = 'var(--color-bg-card)';
-                    }
-                  }}
-                >
-                <PokemonSprite pokemonName={encounter.pokemon} />
-                <div
-                  style={{
-                    textAlign: 'center',
-                    width: '100%',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      color: 'var(--color-text-primary)',
-                      textTransform: 'capitalize',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    {encounter.pokemon}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.85rem',
-                      color: 'var(--color-text-secondary)',
-                    }}
-                  >
-                    Lv. {encounter.minLevel}
-                    {encounter.maxLevel !== encounter.minLevel
-                      ? `-${encounter.maxLevel}`
-                      : ''}
-                  </div>
-                  {encounter.methods && Array.isArray(encounter.methods) && encounter.methods.length > 0 && (
-                    <div
-                      style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--color-text-secondary)',
-                        marginTop: '4px',
-                      }}
-                    >
-                      {encounter.methods.join(', ')}
-                    </div>
-                  )}
-                </div>
-              </div>
+                  encounter={encounter}
+                  isClickable={isClickable}
+                  onLogEncounterWithPokemon={onLogEncounterWithPokemon}
+                />
               );
             })}
           </div>
@@ -493,7 +529,7 @@ export const RoutesPage = () => {
           </h1>
           <button
             className="btn btn-outline"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(`/dashboard?gameFileId=${gameFileId}`)}
             style={{ fontSize: '0.9rem', padding: '8px 16px' }}
           >
             {'<-'} Back to Dashboard

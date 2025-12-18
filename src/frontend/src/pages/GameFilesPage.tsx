@@ -149,7 +149,7 @@ export const GameFilesPage = () => {
         <div style={{ display: 'flex', gap: '12px' }}>
           {currentGameFile && (
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate(`/dashboard?gameFileId=${currentGameFile.id}`)}
               className="btn btn-primary"
               style={{ fontSize: '14px', padding: '8px 16px' }}
             >
@@ -384,7 +384,7 @@ export const GameFilesPage = () => {
                   isSelected={currentGameFile?.id === gameFile.id}
                   onSelect={() => {
                     setCurrentGameFile(gameFile);
-                    navigate('/dashboard');
+                    navigate(`/dashboard?gameFileId=${gameFile.id}`);
                   }}
                   onDelete={() => handleDeleteGameFile(gameFile.id)}
                 />
