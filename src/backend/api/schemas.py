@@ -117,6 +117,8 @@ class PokemonUpdate(BaseModel):
     level: Optional[int] = Field(None, ge=1, le=100)
     nickname: Optional[str] = None
     status: Optional[Status] = None
+    nature: Optional[Nature] = None
+    ability: Optional[str] = None
 
 class PokemonResponse(PokemonBase):
     pass  # Inherits everything from PokemonBase including Config

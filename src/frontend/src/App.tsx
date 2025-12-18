@@ -8,6 +8,9 @@ import { LoginPage } from './pages/LoginPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { GameFilesPage } from './pages/GameFilesPage';
 import { StarterSelectionPage } from './pages/StarterSelectionPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { TeamPage } from './pages/TeamPage';
+import { RoutesPage } from './pages/RoutesPage';
 import './App.css';
 
 // Protected Route Component
@@ -66,6 +69,30 @@ function App() {
           }
         />
         <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/team"
+          element={
+            <ProtectedRoute>
+              <TeamPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/routes"
+          element={
+            <ProtectedRoute>
+              <RoutesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/starters"
           element={
             <ProtectedRoute>
@@ -73,15 +100,15 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route 
-          path="/" 
+        <Route
+          path="/"
           element={
             isAuthenticated ? (
-              <Navigate to="/game-files" replace />
+              <Navigate to="/dashboard" replace />
             ) : (
               <Navigate to="/login" replace />
             )
-          } 
+          }
         />
         <Route 
           path="*" 

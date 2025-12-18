@@ -8,6 +8,7 @@ import {
   getStoredPokemon,
   getFaintedPokemon,
   getPokemonInfo,
+  getPokemonInfoByName,
   addPokemon,
   updatePokemon,
   evolvePokemon,
@@ -55,6 +56,14 @@ export const usePokemonInfo = (pokeId: number | null) => {
     queryKey: pokeId ? queryKeys.pokemonInfo(pokeId) : ['pokemon', 'info', 'disabled'],
     queryFn: () => getPokemonInfo(pokeId!),
     enabled: !!pokeId,
+  });
+};
+
+export const usePokemonInfoByName = (pokemonName: string | null) => {
+  return useQuery({
+    queryKey: pokemonName ? ['pokemon', 'info', 'name', pokemonName] : ['pokemon', 'info', 'name', 'disabled'],
+    queryFn: () => getPokemonInfoByName(pokemonName!),
+    enabled: !!pokemonName,
   });
 };
 

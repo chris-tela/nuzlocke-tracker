@@ -8,7 +8,8 @@
 
 :root {
   /* Primary Colors */
-  --color-pokemon-red: #DC2626; /* Softer, more modern red */
+  --color-pokemon-red: #C85A5A; /* Conservative, muted red - for destructive actions only */
+  --color-pokemon-primary: #4F46E5; /* Indigo - primary action color (darker) */
   --color-pokemon-blue: #3B82F6;
   --color-pokemon-yellow: #FFD700;
   --color-pokemon-green: #22C55E;
@@ -167,17 +168,32 @@ h3 {
 }
 
 .btn-primary {
-  background-color: var(--color-pokemon-red);
+  background-color: var(--color-pokemon-primary);
   color: var(--color-text-white);
-  border-color: #CC0000;
+  border-color: #4338CA;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #CC0000;
+  background-color: #4338CA;
   transform: scale(1.02);
 }
 
 .btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-danger {
+  background-color: var(--color-pokemon-red);
+  color: var(--color-text-white);
+  border-color: #B84A4A;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #B84A4A;
+  transform: scale(1.02);
+}
+
+.btn-danger:active:not(:disabled) {
   transform: scale(0.98);
 }
 
@@ -194,11 +210,22 @@ h3 {
 
 .btn-outline {
   background-color: transparent;
+  color: var(--color-pokemon-primary);
+  border-color: var(--color-pokemon-primary);
+}
+
+.btn-outline:hover:not(:disabled) {
+  background-color: var(--color-pokemon-primary);
+  color: var(--color-text-white);
+}
+
+.btn-outline-danger {
+  background-color: transparent;
   color: var(--color-pokemon-red);
   border-color: var(--color-pokemon-red);
 }
 
-.btn-outline:hover:not(:disabled) {
+.btn-outline-danger:hover:not(:disabled) {
   background-color: var(--color-pokemon-red);
   color: var(--color-text-white);
 }

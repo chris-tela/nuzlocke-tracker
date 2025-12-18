@@ -97,8 +97,8 @@ export const StarterSelectionPage = () => {
         status: Status.PARTY,
       });
 
-      // Navigate to game files page after successful starter selection
-      navigate('/game-files');
+      // Navigate to dashboard after successful starter selection (per Phase 4.3)
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to add starter Pokemon');
     } finally {

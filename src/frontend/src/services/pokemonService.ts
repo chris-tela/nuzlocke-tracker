@@ -20,6 +20,8 @@ export interface PokemonUpdate {
   level?: number;
   nickname?: string | null;
   status?: StatusValue | string | null;
+  nature?: string | null;
+  ability?: string | null;
 }
 
 export interface SwapResponse {
@@ -118,6 +120,13 @@ export const swapPokemon = async (
  */
 export const getPokemonInfo = async (pokeId: number): Promise<BasePokemon> => {
   return await apiHelpers.get<BasePokemon>(`/api/pokemon/${pokeId}`);
+};
+
+/**
+ * Get base pokemon information by name
+ */
+export const getPokemonInfoByName = async (pokemonName: string): Promise<BasePokemon> => {
+  return await apiHelpers.get<BasePokemon>(`/api/pokemon/name/${pokemonName}`);
 };
 
 /**

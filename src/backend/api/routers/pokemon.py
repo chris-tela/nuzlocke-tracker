@@ -159,6 +159,12 @@ async def update_pokemon(id: int, game_file_id: int,
     if pokemon_update.nickname is not None:
         pokemon.nickname = str(pokemon_update.nickname)  # type: ignore
 
+    if pokemon_update.nature is not None:
+        pokemon.nature = pokemon_update.nature  # type: ignore
+    
+    if pokemon_update.ability is not None:
+        pokemon.ability = str(pokemon_update.ability)  # type: ignore
+
     if pokemon_update.status is not None:
         # Check if trying to set status to PARTY and party is already full
         if pokemon_update.status == models.Status.PARTY:
@@ -232,14 +238,25 @@ async def evolve_pokemon(id: int, evolved_pokemon_name: str, game_file_id: int,
                         return evolve(pokemon, evolved_pokemon, db)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evolution not found!")
 
-# TODO: update ability (if  abilities__contains__(ability) --> keep, else, ?)
 def evolve(current_pokemon: models.OwnedPokemon, evolved_pokemon: models.AllPokemon, db: Session):
-    
+    """
+    Evolve a Pokemon, handling ability changes:
+    - If current ability exists in evolved Pokemon's abilities, keep it
+    - Otherwise, clear ability (set to None) for user to select
+    """
     current_pokemon.name = evolved_pokemon.name
     current_pokemon.poke_id = evolved_pokemon.poke_id
     current_pokemon.types = evolved_pokemon.types
-    current_pokemon.evolution_data =evolved_pokemon.evolution_data
+    current_pokemon.evolution_data = evolved_pokemon.evolution_data
     current_pokemon.sprite = evolved_pokemon.sprite
+    
+    # Handle ability: keep if it exists in evolved form's abilities, otherwise clear it
+    if current_pokemon.ability and evolved_pokemon.abilities:
+        if current_pokemon.ability not in evolved_pokemon.abilities:
+            current_pokemon.ability = None  # type: ignore
+    elif not evolved_pokemon.abilities or len(evolved_pokemon.abilities) == 0:
+        # If evolved form has no abilities, clear it
+        current_pokemon.ability = None  # type: ignore
 
     db.commit()
     db.refresh(current_pokemon)
@@ -289,6 +306,36 @@ async def get_pokemon_info(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Pokemon with poke_id {poke_id} not found in database!"
+        )
+    
+    return {
+        "poke_id": pokemon.poke_id,
+        "name": pokemon.name,
+        "types": pokemon.types,
+        "abilities": pokemon.abilities,
+        "weight": pokemon.weight,
+        "base_hp": pokemon.base_hp,
+        "base_attack": pokemon.base_attack,
+        "base_defense": pokemon.base_defense,
+        "base_special_attack": pokemon.base_special_attack,
+        "base_special_defense": pokemon.base_special_defense,
+        "base_speed": pokemon.base_speed,
+        "evolution_data": pokemon.evolution_data,
+        "sprite": pokemon.sprite
+    }
+
+@router.get("/name/{pokemon_name}")
+async def get_pokemon_info_by_name(
+    pokemon_name: str,
+    db: Session = Depends(get_db)
+):
+    """Get base pokemon information by name."""
+    pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.name == pokemon_name.lower()).first()
+    
+    if pokemon is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pokemon with name '{pokemon_name}' not found in database!"
         )
     
     return {

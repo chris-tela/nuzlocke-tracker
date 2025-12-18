@@ -147,6 +147,15 @@ export const GameFilesPage = () => {
           Game Files
         </h1>
         <div style={{ display: 'flex', gap: '12px' }}>
+          {currentGameFile && (
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn btn-primary"
+              style={{ fontSize: '14px', padding: '8px 16px' }}
+            >
+              Go to Dashboard
+            </button>
+          )}
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
             className="btn btn-primary"
@@ -373,7 +382,10 @@ export const GameFilesPage = () => {
                   key={gameFile.id}
                   gameFile={gameFile}
                   isSelected={currentGameFile?.id === gameFile.id}
-                  onSelect={() => setCurrentGameFile(gameFile)}
+                  onSelect={() => {
+                    setCurrentGameFile(gameFile);
+                    navigate('/dashboard');
+                  }}
                   onDelete={() => handleDeleteGameFile(gameFile.id)}
                 />
               ))}
@@ -610,8 +622,8 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
           style={{
             flex: 1,
             maxWidth: '200px',
-            backgroundColor: isSelected ? 'var(--color-pokemon-yellow)' : 'var(--color-pokemon-red)',
-            borderColor: isSelected ? '#D4AF37' : '#CC0000',
+            backgroundColor: isSelected ? 'var(--color-pokemon-yellow)' : 'var(--color-pokemon-primary)',
+            borderColor: isSelected ? '#D4AF37' : '#4338CA',
             color: isSelected ? '#1A1A1A' : 'var(--color-text-white)',
           }}
         >
@@ -622,7 +634,7 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
             e.stopPropagation();
             onDelete();
           }}
-          className="btn btn-outline"
+          className="btn btn-outline-danger"
           style={{
             flex: 1,
             maxWidth: '200px',

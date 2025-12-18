@@ -40,8 +40,19 @@ export const useUpcomingRoutes = (gameFileId: number | null) => {
 export const useRouteEncounters = (route: string | number | null) => {
   return useQuery({
     queryKey: route ? queryKeys.routeEncounters(route) : ['routes', 'encounters', 'disabled'],
-    queryFn: () => getRouteEncounters(route!),
+    queryFn: async () => {
+      try {
+        return await getRouteEncounters(route!);
+      } catch (error: any) {
+        // Handle 404s gracefully - some routes (gyms, special locations) don't have encounter data
+        if (error?.response?.status === 404) {
+          return { route: route as string, data: [] };
+        }
+        throw error;
+      }
+    },
     enabled: !!route,
+    retry: false, // Don't retry 404s
   });
 };
 
@@ -69,6 +80,9 @@ export const useAddPokemonFromRoute = (gameFileId: number | null) => {
       if (gameFileId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
+        // Also invalidate route queries so the route moves to encountered
+        queryClient.invalidateQueries({ queryKey: queryKeys.routeProgress(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.upcomingRoutes(gameFileId) });
       }
     },
   });
