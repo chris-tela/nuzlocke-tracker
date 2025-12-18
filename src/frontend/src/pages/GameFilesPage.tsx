@@ -16,7 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 export const GameFilesPage = () => {
   const navigate = useNavigate();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
   const { gameFiles, setGameFiles, currentGameFile, setCurrentGameFile } = useGameFile();
   const { data: versions = [], isLoading: isLoadingVersions } = useVersions();
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -167,7 +167,7 @@ export const GameFilesPage = () => {
       {/* Create Game File Form */}
       {showCreateForm && (
         <div className="card" style={{
-          maxWidth: '600px',
+          maxWidth: '900px',
           width: '100%',
           padding: '28px',
         }}>
@@ -206,10 +206,9 @@ export const GameFilesPage = () => {
 
             <div style={{ marginBottom: '24px' }}>
               <label
-                htmlFor="game-select"
                 style={{
                   display: 'block',
-                  marginBottom: '8px',
+                  marginBottom: '16px',
                   fontSize: '14px',
                   fontWeight: '600',
                   color: 'var(--color-text-primary)',
@@ -217,22 +216,104 @@ export const GameFilesPage = () => {
               >
                 Game Version
               </label>
-              <select
-                id="game-select"
-                value={selectedGame}
-                onChange={(e) => setSelectedGame(e.target.value)}
-                required
-                className="input"
-                style={{ width: '100%', boxSizing: 'border-box' }}
-                disabled={isLoadingVersions}
-              >
-                <option value="">Select a game...</option>
-                {versions.map((version) => (
-                  <option key={version.version_name} value={version.version_name}>
-                    {version.version_name}
-                  </option>
-                ))}
-              </select>
+              {isLoadingVersions ? (
+                <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-secondary)' }}>
+                  Loading games...
+                </div>
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '16px',
+                  maxHeight: '500px',
+                  overflowY: 'auto',
+                  padding: '8px',
+                }}>
+                  {[...versions]
+                    .sort((a, b) => {
+                      // First sort by generation_id
+                      if (a.generation_id !== b.generation_id) {
+                        return a.generation_id - b.generation_id;
+                      }
+                      // Then sort by version_id within the same generation
+                      return a.version_id - b.version_id;
+                    })
+                    .map((version) => {
+                    const gameImageName = GAME_IMAGE_MAP[version.version_name.toLowerCase()];
+                    const gameImagePath = gameImageName ? `/images/games/${gameImageName}` : null;
+                    const isSelected = selectedGame === version.version_name;
+
+                    return (
+                      <div
+                        key={version.version_name}
+                        onClick={() => setSelectedGame(version.version_name)}
+                        style={{
+                          padding: '12px',
+                          border: isSelected ? '2px solid var(--color-pokemon-yellow)' : '2px solid var(--color-border)',
+                          borderRadius: '8px',
+                          backgroundColor: isSelected ? 'var(--color-bg-light)' : 'var(--color-bg-card)',
+                          cursor: 'pointer',
+                          transition: 'all 150ms ease',
+                          textAlign: 'center',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = 'var(--color-pokemon-blue)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = 'var(--color-border)';
+                          }
+                        }}
+                      >
+                        {gameImagePath ? (
+                          <img
+                            src={gameImagePath}
+                            alt={version.version_name}
+                            style={{
+                              width: '80px',
+                              height: '80px',
+                              objectFit: 'contain',
+                              display: 'block',
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '80px',
+                            height: '80px',
+                            backgroundColor: 'var(--color-bg-light)',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--color-text-secondary)',
+                            fontSize: '10px',
+                          }}>
+                            No Image
+                          </div>
+                        )}
+                        <div style={{
+                          fontSize: '10px',
+                          fontFamily: 'var(--font-pokemon)',
+                          color: 'var(--color-text-primary)',
+                          lineHeight: '1.2',
+                          letterSpacing: '0px',
+                        }}>
+                          {formatGameName(version.version_name)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {error && (
@@ -265,36 +346,40 @@ export const GameFilesPage = () => {
         </div>
       )}
 
-      {/* Game Files List */}
-      {gameFiles.length === 0 ? (
-        <div className="card" style={{
-          maxWidth: '600px',
-          width: '100%',
-          padding: '40px',
-          textAlign: 'center',
-        }}>
-          <p style={{ color: 'var(--color-text-secondary)', fontSize: '18px' }}>
-            No game files found. Create a new game file to get started!
-          </p>
-        </div>
-      ) : (
-        <div style={{
-          width: '100%',
-          maxWidth: '600px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px',
-        }}>
-          {gameFiles.map((gameFile) => (
-            <GameFileCard
-              key={gameFile.id}
-              gameFile={gameFile}
-              isSelected={currentGameFile?.id === gameFile.id}
-              onSelect={() => setCurrentGameFile(gameFile)}
-              onDelete={() => handleDeleteGameFile(gameFile.id)}
-            />
-          ))}
-        </div>
+      {/* Game Files List - Only show when not creating new game */}
+      {!showCreateForm && (
+        <>
+          {gameFiles.length === 0 ? (
+            <div className="card" style={{
+              maxWidth: '600px',
+              width: '100%',
+              padding: '40px',
+              textAlign: 'center',
+            }}>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: '18px' }}>
+                No game files found. Create a new game file to get started!
+              </p>
+            </div>
+          ) : (
+            <div style={{
+              width: '100%',
+              maxWidth: '600px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}>
+              {gameFiles.map((gameFile) => (
+                <GameFileCard
+                  key={gameFile.id}
+                  gameFile={gameFile}
+                  isSelected={currentGameFile?.id === gameFile.id}
+                  onSelect={() => setCurrentGameFile(gameFile)}
+                  onDelete={() => handleDeleteGameFile(gameFile.id)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Last saved info at bottom */}
@@ -319,6 +404,38 @@ interface GameFileCardProps {
   onDelete: () => void;
 }
 
+// Hardcoded mapping of game names to image filenames
+const GAME_IMAGE_MAP: Record<string, string> = {
+  'black': 'black.png',
+  'black-2': 'black2.png',
+  'white': 'white.png',
+  'white-2': 'white2.png',
+  'red': 'red.png',
+  'blue': 'blue.png',
+  'yellow': 'yellow.png',
+  'gold': 'gold.png',
+  'silver': 'silver.png',
+  'crystal': 'crystal.png',
+  'ruby': 'ruby.png',
+  'sapphire': 'sapphire.png',
+  'emerald': 'emerald.png',
+  'firered': 'firered.png',
+  'leafgreen': 'leafgreen.png',
+  'diamond': 'diamond.png',
+  'pearl': 'pearl.png',
+  'platinum': 'platinum.png',
+  'heartgold': 'heartgold.jpg',
+  'soulsilver': 'soulsilver.jpg',
+};
+
+// Capitalize game name (e.g., "black-2" -> "Black-2")
+const formatGameName = (name: string): string => {
+  return name
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join('-');
+};
+
 const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCardProps) => {
   const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFile.id);
   const { data: gymProgress = [], isLoading: isLoadingGyms } = useGymProgress(gameFile.id);
@@ -332,6 +449,10 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
   // Create array of 6 pokemon slots (fill with party pokemon, pad with nulls)
   const pokemonSlots = Array.from({ length: 6 }, (_, i) => partyPokemon[i] || null);
 
+  // Get game image filename from mapping
+  const gameImageName = GAME_IMAGE_MAP[gameFile.game_name.toLowerCase()];
+  const gameImagePath = gameImageName ? `/images/games/${gameImageName}` : null;
+
   return (
     <div className="card" style={{
       padding: '28px',
@@ -343,12 +464,44 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
     }}
     onClick={onSelect}
     >
+      {/* Game Image */}
+      {gameImagePath && (
+        <div style={{
+          width: '100%',
+          marginBottom: '20px',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          backgroundColor: 'var(--color-bg-light)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <img
+            src={gameImagePath}
+            alt={gameFile.game_name}
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+              maxHeight: '300px',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+            onError={(e) => {
+              // Hide image if it fails to load
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+
       {/* Trainer Name */}
       <div style={{
         color: 'var(--color-text-primary)',
-        fontSize: '16px',
+        fontSize: '14px',
         marginBottom: '12px',
-        fontWeight: '600',
+        fontFamily: 'var(--font-pokemon)',
+        lineHeight: '1.0',
+        letterSpacing: '0px',
       }}>
         {gameFile.trainer_name}
       </div>
@@ -356,20 +509,26 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
       {/* Location */}
       <div style={{
         color: 'var(--color-text-primary)',
-        fontSize: '16px',
+        fontSize: '12px',
         marginBottom: '12px',
+        fontFamily: 'var(--font-pokemon)',
+        lineHeight: '1.4',
+        letterSpacing: '0px',
       }}>
-        {gameFile.game_name}
+        {formatGameName(gameFile.game_name)}
       </div>
 
       {/* Stats */}
       <div style={{
         color: 'var(--color-text-primary)',
-        fontSize: '16px',
+        fontSize: '10px',
         marginBottom: '20px',
         display: 'flex',
         gap: '16px',
         flexWrap: 'wrap',
+        fontFamily: 'var(--font-pokemon)',
+        lineHeight: '1.4',
+        letterSpacing: '0px',
       }}>
         {isLoading ? (
           <span style={{ color: 'var(--color-text-secondary)' }}>Loading...</span>
