@@ -1,6 +1,6 @@
 export enum Nature {
   HARDY = 'Hardy',
-  LONELY = 'Londy',
+  LONELY = 'Lonely',
   BRAVE = 'Brave',
   ADAMANT = 'Adamant',
   NAUGHTY = 'Naughty',

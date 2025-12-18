@@ -98,8 +98,8 @@ def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
     
     party_pokemon = db.query(models.OwnedPokemon).filter(models.OwnedPokemon.game_file_id == game_file_id, models.OwnedPokemon.status == models.Status.PARTY).all()
 
-    if (len(party_pokemon) == 0 or len(party_pokemon) >= 6) and pokemon.status == models.Status.PARTY:
-         pokemon.status = models.Status.UNKNOWN
+    if (len(party_pokemon) >= 6) and pokemon.status == models.Status.PARTY:
+         pokemon.status = models.Status.STORED
 
     
     pokemon_to_db = models.OwnedPokemon(
@@ -337,9 +337,18 @@ async def get_starters(
     # Gen 5 pokedex starts with victini, which breaks the pattern
     generation_id = getattr(gen, 'generation_id', None)
     if generation_id == 5:
-        starters = pokedex[1:4]  # Skip index 0 (Victini), get next 3
+        starter_names = pokedex[1:4]  # Skip index 0 (Victini), get next 3
     else:
-        starters = pokedex[0:3]  # First 3 pokemon are starters
+        starter_names = pokedex[0:3]  # First 3 pokemon are starters
+    
+    # Look up full Pokemon data for each starter name
+    starters = []
+    for starter_name in starter_names:
+        pokemon = db.query(models.AllPokemon).filter(
+            models.AllPokemon.name == starter_name
+        ).first()
+        if pokemon:
+            starters.append(pokemon)
     
     return {"starters": starters}
 

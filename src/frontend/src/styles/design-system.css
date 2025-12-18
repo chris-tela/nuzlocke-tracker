@@ -264,6 +264,26 @@ h3 {
   color: var(--color-text-white);
 }
 
+/* Pokemon Type Badge Colors */
+.type-normal { background-color: var(--color-type-normal) !important; }
+.type-fire { background-color: var(--color-type-fire) !important; }
+.type-water { background-color: var(--color-type-water) !important; }
+.type-electric { background-color: var(--color-type-electric) !important; }
+.type-grass { background-color: var(--color-type-grass) !important; }
+.type-ice { background-color: var(--color-type-ice) !important; }
+.type-fighting { background-color: var(--color-type-fighting) !important; }
+.type-poison { background-color: var(--color-type-poison) !important; }
+.type-ground { background-color: var(--color-type-ground) !important; }
+.type-flying { background-color: var(--color-type-flying) !important; }
+.type-psychic { background-color: var(--color-type-psychic) !important; }
+.type-bug { background-color: var(--color-type-bug) !important; }
+.type-rock { background-color: var(--color-type-rock) !important; }
+.type-ghost { background-color: var(--color-type-ghost) !important; }
+.type-dragon { background-color: var(--color-type-dragon) !important; }
+.type-dark { background-color: var(--color-type-dark) !important; }
+.type-steel { background-color: var(--color-type-steel) !important; }
+.type-fairy { background-color: var(--color-type-fairy) !important; }
+
 .badge-status-party {
   background-color: var(--color-pokemon-green);
   color: var(--color-text-white);

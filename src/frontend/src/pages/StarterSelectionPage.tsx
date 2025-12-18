@@ -8,6 +8,8 @@ import { useGameFile } from '../hooks/useGameFile';
 import { useVersionStarters } from '../hooks/usePokemon';
 import { useAddPokemon } from '../hooks/usePokemon';
 import { getGameFile } from '../services/gameFileService';
+import { Nature, Status } from '../types/enums';
+import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 
 export const StarterSelectionPage = () => {
   const navigate = useNavigate();
@@ -19,29 +21,55 @@ export const StarterSelectionPage = () => {
   const [gender, setGender] = useState<string>('');
   const [nature, setNature] = useState<string>('');
   const [ability, setAbility] = useState<string>('');
-  const [level, setLevel] = useState<number>(5);
+  const [levelInput, setLevelInput] = useState<string>('5');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingGameFile, setIsLoadingGameFile] = useState(true); // Start as true to show loading initially
 
-  // Load game file if not already loaded
+  // Convert levelInput to number for validation and submission
+  const level = parseInt(levelInput, 10) || 0;
+
+  // Helper function to capitalize Pokemon names
+  const capitalizePokemonName = (name: string): string => {
+    return name
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join('-');
+  };
+
+  // Load game file if not already loaded or if it doesn't match the URL param
   useEffect(() => {
-    if (gameFileId && !currentGameFile) {
+    if (!gameFileId || gameFileId === 0) {
+      // Invalid gameFileId, redirect back
+      navigate('/game-files');
+      return;
+    }
+
+    // If we don't have a game file, or if the current one doesn't match the URL param
+    if (!currentGameFile || currentGameFile.id !== gameFileId) {
+      setIsLoadingGameFile(true);
       const loadGameFile = async () => {
         try {
           const gameFile = await getGameFile(gameFileId);
           setCurrentGameFile(gameFile);
         } catch (error) {
           console.error('Failed to load game file:', error);
-          navigate('/game-files');
+          setError('Failed to load game file. Please try again.');
+          // Don't navigate immediately, let user see the error
+        } finally {
+          setIsLoadingGameFile(false);
         }
       };
       loadGameFile();
+    } else {
+      // Game file is already loaded and matches
+      setIsLoadingGameFile(false);
     }
   }, [gameFileId, currentGameFile, setCurrentGameFile, navigate]);
 
   const gameName = currentGameFile?.game_name || '';
-  const { data: starters = [], isLoading: isLoadingStarters } = useVersionStarters(gameName);
-  const addPokemonMutation = useAddPokemon(gameFileId || null);
+  const { data: starters = [], isLoading: isLoadingStarters } = useVersionStarters(gameName || null);
+  const addPokemonMutation = useAddPokemon(gameFileId > 0 ? gameFileId : null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +94,7 @@ export const StarterSelectionPage = () => {
         ability: ability || null,
         level: level,
         gender: gender || null,
-        status: 'PARTY',
+        status: Status.PARTY,
       });
 
       // Navigate to game files page after successful starter selection
@@ -80,7 +108,8 @@ export const StarterSelectionPage = () => {
 
   const selectedStarterData = starters.find((s) => s.poke_id === selectedStarter);
 
-  if (!gameFileId) {
+  // Show loading state while game file is being loaded
+  if (!gameFileId || gameFileId === 0) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -98,6 +127,24 @@ export const StarterSelectionPage = () => {
           >
             Back to Game Files
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingGameFile || !currentGameFile || !gameName) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: 'var(--color-bg-light)',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--color-text-secondary)' }}>
+            {isLoadingGameFile ? 'Loading game file...' : 'Loading game information...'}
+          </p>
         </div>
       </div>
     );
@@ -134,9 +181,33 @@ export const StarterSelectionPage = () => {
           Select your starter Pokemon to begin your Nuzlocke journey!
         </p>
 
-        {isLoadingStarters ? (
+        {error && (
+          <div style={{
+            marginBottom: '20px',
+            padding: '12px',
+            backgroundColor: '#FEE2E2',
+            border: '2px solid #F87171',
+            borderRadius: '8px',
+            color: '#991B1B',
+            fontSize: '14px',
+            textAlign: 'center',
+          }}>
+            {error}
+            <button
+              onClick={() => navigate('/game-files')}
+              className="btn btn-primary"
+              style={{ marginTop: '12px', display: 'block', margin: '12px auto 0' }}
+            >
+              Back to Game Files
+            </button>
+          </div>
+        )}
+
+        {isLoadingStarters || !gameName ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
-            <p style={{ color: 'var(--color-text-secondary)' }}>Loading starters...</p>
+            <p style={{ color: 'var(--color-text-secondary)' }}>
+              {!gameName ? 'Loading game information...' : 'Loading starters...'}
+            </p>
           </div>
         ) : starters.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px' }}>
@@ -207,30 +278,20 @@ export const StarterSelectionPage = () => {
                       color: 'var(--color-text-primary)',
                       marginBottom: '8px',
                     }}>
-                      {starter.name}
+                      {capitalizePokemonName(starter.name)}
                     </div>
-                    <div style={{
-                      display: 'flex',
-                      gap: '8px',
-                      justifyContent: 'center',
-                      flexWrap: 'wrap',
-                    }}>
-                      {starter.types.map((type) => (
-                        <span
-                          key={type}
-                          style={{
-                            padding: '4px 8px',
-                            backgroundColor: 'var(--color-pokemon-blue)',
-                            color: 'var(--color-text-white)',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                          }}
-                        >
-                          {type}
-                        </span>
-                      ))}
-                    </div>
+                    {starter.types && starter.types.length > 0 && (
+                      <div style={{
+                        display: 'flex',
+                        gap: '8px',
+                        justifyContent: 'center',
+                        flexWrap: 'wrap',
+                      }}>
+                        {starter.types.map((type) => (
+                          <PokemonTypeBadge key={type} type={type} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -299,13 +360,45 @@ export const StarterSelectionPage = () => {
                     <input
                       id="level"
                       type="number"
-                      value={level}
-                      onChange={(e) => setLevel(parseInt(e.target.value, 10) || 5)}
-                      min={1}
-                      max={100}
+                      value={levelInput}
+                      onChange={(e) => {
+                        const inputValue = e.target.value;
+                        // Allow empty input while typing (for deletion)
+                        setLevelInput(inputValue);
+                      }}
+                      onBlur={(e) => {
+                        // Ensure value is within range when input loses focus
+                        const inputValue = e.target.value;
+                        if (inputValue === '' || inputValue === '0') {
+                          setLevelInput('5'); // Default to 5 if empty
+                        } else {
+                          const numValue = parseInt(inputValue, 10);
+                          if (isNaN(numValue) || numValue < 1) {
+                            setLevelInput('1');
+                          } else if (numValue > 100) {
+                            setLevelInput('100');
+                          } else {
+                            setLevelInput(numValue.toString());
+                          }
+                        }
+                      }}
                       className="input"
-                      style={{ width: '100%', boxSizing: 'border-box' }}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        borderColor: (level < 1 || level > 100) && levelInput !== '' ? '#F87171' : undefined,
+                        borderWidth: (level < 1 || level > 100) && levelInput !== '' ? '2px' : undefined,
+                      }}
                     />
+                    {(level < 1 || level > 100) && levelInput !== '' && (
+                      <p style={{
+                        marginTop: '4px',
+                        fontSize: '12px',
+                        color: '#F87171',
+                      }}>
+                        Level must be between 1 and 100
+                      </p>
+                    )}
                   </div>
 
                   {/* Gender */}
@@ -349,15 +442,20 @@ export const StarterSelectionPage = () => {
                     >
                       Nature (optional)
                     </label>
-                    <input
+                    <select
                       id="nature"
-                      type="text"
                       value={nature}
                       onChange={(e) => setNature(e.target.value)}
                       className="input"
-                      placeholder="e.g., Adamant"
                       style={{ width: '100%', boxSizing: 'border-box' }}
-                    />
+                    >
+                      <option value="">None</option>
+                      {Object.values(Nature).map((natureValue) => (
+                        <option key={natureValue} value={natureValue}>
+                          {natureValue}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Ability */}
