@@ -33,7 +33,7 @@ It provides an interactive way to **plan, record, and review** each run while ma
   Progress, route, and team data are stored in **PostgreSQL** and **SQLite** databases for structured querying and analytics.
 
 - **Future-Ready Architecture:**  
-  Designed with web integration in mind, supporting upcoming features like interactive battle simulations and matchup analysis.
+  Supporting upcoming features like interactive battle simulations and matchup analysis.
 
 
 ## 🧩 Tech Stack
