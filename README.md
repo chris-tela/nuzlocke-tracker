@@ -14,35 +14,43 @@ It provides an interactive way to **plan, record, and review** each run while ma
 
 ## ⚙️ Current Features
 
-- **CLI Interface:**  
-  Fully functional command-line interface as the backend foundation for future web integration.
+- **Full-Stack Functionality:**  
+  While a playable CLI is still available, the project now includes a web app in development for a more interactive experience.
 
-- **Comprehensive Game Walkthrough Data:**  
-  Automatically loads and structures every route, trainer, and encounter from mainline Pokémon games.  
-  For example, a new run begins on Route 1 with access to all relevant Pokémon encounter data and upcoming locations.
+- **Comprehensive Pokémon Database:**  
+  Includes all Pokémon data, gym trainers, and movesets, allowing for complete team management and strategic planning.
+
+- **Ordered Walkthrough Data:**  
+  Structured routes and trainer encounters for every mainline Pokémon game, providing a guided progression for each run.
+
+- **Team Management & Storage:**  
+  Tracks player teams, including caught Pokémon, stats, and progress across multiple runs.
 
 - **Progress Tracking:**  
-  Stores progression per run, including current team, defeated trainers, and caught Pokémon.
+  Stores run-specific data such as current location, defeated trainers, and captured Pokémon.
 
 - **Data Persistence:**  
-  Progress and route data are stored in a **PostgreSQL** database for structured querying and cross-run analytics.
+  Progress, route, and team data are stored in **PostgreSQL** and **SQLite** databases for structured querying and analytics.
 
----
+- **Future-Ready Architecture:**  
+  Supporting upcoming features like interactive battle simulations and matchup analysis.
+
 
 ## 🧩 Tech Stack
 
 | Layer | Technology |
 |-------|-------------|
-| **Language** | Python |
+| **Language** | Python, TypeScript |
 | **Web Scraping / Data Aggregation** | BeautifulSoup, PokeAPI |
-| **Database** | PostgreSQL |
-| **Architecture** | CLI-based backend as a simulation of app's core logic |
+| **Frontend / UI** | React |
+| **Authentication** | OAuth, JWT |
+| **Database** | PostgreSQL, SQLite |
 
 ---
 
 ## 🚀 Future Roadmap
 
-### 1. Web & Mobile Application
+### 1. Web & Mobile Application (work in progress!)
 - Frontend development for browser and mobile environments.
 - Integration with RESTful APIs for full user interaction and account-based tracking.
 
@@ -53,6 +61,11 @@ It provides an interactive way to **plan, record, and review** each run while ma
 ### 3. Save File Integration
 - Reverse-engineering `.sav` files to import real in-game progress directly into the tracker.
 - Automatic updating of Pokémon, routes, and badges from user save data.
+
+### 4. Damage Calculator & Matchup Synergy
+- Calculates expected damage for moves based on stats, type advantages, and in-game conditions.  
+- Evaluates Pokémon pairings to highlight synergy, helping players plan strategies.
+
 
 ---
 
