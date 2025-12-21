@@ -12,6 +12,7 @@ import {
 } from '../services/routeService';
 import { queryKeys } from './queryKeys';
 import type { PokemonCreate } from '../services/pokemonService';
+import { useVersion } from './useVersions';
 
 export const useRoutes = (gameFileId: number | null) => {
   return useQuery({
@@ -37,12 +38,17 @@ export const useUpcomingRoutes = (gameFileId: number | null) => {
   });
 };
 
-export const useRouteEncounters = (route: string | number | null) => {
+export const useRouteEncounters = (route: string | number | null, gameName: string | null) => {
+  const { data: version, isLoading: isLoadingVersion } = useVersion(gameName);
+  
   return useQuery({
-    queryKey: route ? queryKeys.routeEncounters(route) : ['routes', 'encounters', 'disabled'],
+    queryKey: route && version ? queryKeys.routeEncounters(route) : ['routes', 'encounters', 'disabled'],
     queryFn: async () => {
+      if (!version) {
+        throw new Error('Version not found');
+      }
       try {
-        return await getRouteEncounters(route!);
+        return await getRouteEncounters(version.version_id, route!);
       } catch (error: any) {
         // Handle 404s gracefully - some routes (gyms, special locations) don't have encounter data
         if (error?.response?.status === 404) {
@@ -51,7 +57,7 @@ export const useRouteEncounters = (route: string | number | null) => {
         throw error;
       }
     },
-    enabled: !!route,
+    enabled: !!route && !!version && !isLoadingVersion,
     retry: false, // Don't retry 404s
   });
 };

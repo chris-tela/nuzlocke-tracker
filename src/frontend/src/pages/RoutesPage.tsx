@@ -10,6 +10,34 @@ import { usePokemonInfoByName } from '../hooks/usePokemon';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 
+// Helper function to get encounter method icon path
+const getEncounterMethodIcon = (method: string): string | null => {
+  const methodLower = method.toLowerCase();
+  
+  // Handle special mappings (multiple methods map to one icon)
+  if (methodLower === 'gift' || methodLower === 'gift-egg') {
+    return '/images/encounters/gift.png';
+  }
+  if (methodLower === 'surf' || methodLower === 'surf-spots') {
+    return '/images/encounters/surf.png';
+  }
+  if (methodLower === 'super-rod' || methodLower === 'super-rod-spots') {
+    return '/images/encounters/super-rod.png';
+  }
+  
+  // 1-to-1 mappings
+  const methodIcons: Record<string, string> = {
+    'walk': '/images/encounters/walk.png',
+    'dark-grass': '/images/encounters/dark-grass.png',
+    'good-rod': '/images/encounters/good-rod.png',
+    'grass-spots': '/images/encounters/grass-spots.png',
+    'old-rod': '/images/encounters/old-rod.png',
+    'rock-smash': '/images/encounters/rock-smash.png',
+  };
+  
+  return methodIcons[methodLower] || null;
+};
+
 // Component to display Pokemon sprite with loading state
 const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
   const { data: pokemonInfo, isLoading } = usePokemonInfoByName(pokemonName.toLowerCase());
@@ -90,7 +118,7 @@ const EncounterCard = ({
   isClickable,
   onLogEncounterWithPokemon,
 }: {
-  encounter: { pokemon: string; minLevel: number; maxLevel: number; methods?: string[] };
+  encounter: { pokemon: string; minLevel: number; maxLevel: number; methods?: string[]; chance?: number };
   isClickable: boolean;
   onLogEncounterWithPokemon: (pokemonName: string) => void;
 }) => {
@@ -163,23 +191,68 @@ const EncounterCard = ({
         <div
           style={{
             fontSize: '0.85rem',
-            color: 'var(--color-text-secondary)',
+            color: 'var(--color-text-primary)',
+            fontWeight: 500,
           }}
         >
           Lv. {encounter.minLevel}
           {encounter.maxLevel !== encounter.minLevel
             ? `-${encounter.maxLevel}`
             : ''}
+          {encounter.chance !== undefined && (
+            <>, {encounter.chance}%</>
+          )}
         </div>
         {encounter.methods && Array.isArray(encounter.methods) && encounter.methods.length > 0 && (
           <div
             style={{
-              fontSize: '0.75rem',
-              color: 'var(--color-text-secondary)',
+              display: 'flex',
+              gap: '6px',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
               marginTop: '4px',
             }}
           >
-            {encounter.methods.join(', ')}
+            {encounter.methods.map((method, index) => {
+              const iconPath = getEncounterMethodIcon(method);
+              return (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {iconPath ? (
+                    <img
+                      src={iconPath}
+                      alt={method}
+                      title={method}
+                      style={{
+                        width: '35px',
+                        height: '35px',
+                        objectFit: 'contain',
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : null}
+                  {!iconPath && (
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--color-text-secondary)',
+                      }}
+                    >
+                      {method}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -194,16 +267,18 @@ const RouteCard = ({
   onMarkAsSeen,
   onLogEncounter,
   onLogEncounterWithPokemon,
+  gameName,
 }: {
   routeName: string;
   isEncountered: boolean;
   onMarkAsSeen: () => void;
   onLogEncounter: () => void;
   onLogEncounterWithPokemon: (pokemonName: string) => void;
+  gameName: string | null;
 }) => {
-  const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(routeName);
+  const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(routeName, gameName);
 
-  // Parse encounter data - format: [pokemonName, minLevel, maxLevel, region, methods?]
+  // Parse encounter data - format: [pokemonName, minLevel, maxLevel, version_name, region_name, methods, chance]
   const parseEncounters = () => {
     if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
       return [];
@@ -212,8 +287,10 @@ const RouteCard = ({
       pokemon: enc[0] || '',
       minLevel: enc[1] || 0,
       maxLevel: enc[2] || 0,
-      region: enc[3] || '',
-      methods: enc[4] || [],
+      version_name: enc[3] || '',
+      region: enc[4] || '',
+      methods: enc[5] || [],
+      chance: enc[6] !== undefined ? enc[6] : undefined,
     }));
   };
 
@@ -306,6 +383,7 @@ export const RoutesPage = () => {
   const navigate = useNavigate();
   const { currentGameFile } = useGameFile();
   const gameFileId = currentGameFile?.id ?? null;
+  const gameName = currentGameFile?.game_name ?? null;
 
   const { data: upcomingRoutes = [], isLoading: isLoadingUpcoming } = useUpcomingRoutes(gameFileId);
   const { data: encounteredRoutes = [], isLoading: isLoadingEncountered } = useRouteProgress(gameFileId);
@@ -335,7 +413,7 @@ export const RoutesPage = () => {
   const { data: pokemonInfo } = usePokemonInfoByName(selectedPokemonName || null);
 
   // Fetch encounters for the selected route (for the modal)
-  const { data: routeEncounters } = useRouteEncounters(selectedRoute);
+  const { data: routeEncounters } = useRouteEncounters(selectedRoute, gameName);
 
   useEffect(() => {
     if (!currentGameFile) {
@@ -376,7 +454,7 @@ export const RoutesPage = () => {
     }
     const encounter = routeEncounters.data.find(
       (enc: any) => enc[0]?.toLowerCase() === pokemonName.toLowerCase()
-    );
+    ) as any;
     return encounter && encounter[1] ? encounter[1] : null;
   };
 
@@ -424,8 +502,10 @@ export const RoutesPage = () => {
         pokemon: enc[0] || '',
         minLevel: enc[1] || 0,
         maxLevel: enc[2] || 0,
-        region: enc[3] || '',
-        methods: enc[4] || [],
+        version_name: enc[3] || '',
+        region: enc[4] || '',
+        methods: enc[5] || [],
+        chance: enc[6] !== undefined ? enc[6] : undefined,
       }));
     };
 
@@ -486,8 +566,10 @@ export const RoutesPage = () => {
       pokemon: enc[0] || '',
       minLevel: enc[1] || 0,
       maxLevel: enc[2] || 0,
-      region: enc[3] || '',
-      methods: enc[4] || [],
+      version_name: enc[3] || '',
+      region: enc[4] || '',
+      methods: enc[5] || [],
+      chance: enc[6] !== undefined ? enc[6] : undefined,
     }));
   };
 
@@ -529,7 +611,7 @@ export const RoutesPage = () => {
           </h1>
           <button
             className="btn btn-outline"
-            onClick={() => navigate(`/dashboard?gameFileId=${gameFileId}`)}
+            onClick={() => navigate('/dashboard')}
             style={{ fontSize: '0.9rem', padding: '8px 16px' }}
           >
             {'<-'} Back to Dashboard
@@ -593,6 +675,7 @@ export const RoutesPage = () => {
                     onMarkAsSeen={() => handleMarkAsSeen(routeName)}
                     onLogEncounter={() => handleOpenCatchModal(routeName)}
                     onLogEncounterWithPokemon={(pokemonName) => handleOpenCatchModal(routeName, pokemonName)}
+                    gameName={gameName}
                   />
                 ))}
               </div>
@@ -657,6 +740,7 @@ export const RoutesPage = () => {
                     onMarkAsSeen={() => handleMarkAsSeen(routeName)}
                     onLogEncounter={() => handleOpenCatchModal(routeName)}
                     onLogEncounterWithPokemon={(pokemonName) => handleOpenCatchModal(routeName, pokemonName)}
+                    gameName={gameName}
                   />
                 ))}
               </div>

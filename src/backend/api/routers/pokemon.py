@@ -251,10 +251,10 @@ def evolve(current_pokemon: models.OwnedPokemon, evolved_pokemon: models.AllPoke
     current_pokemon.sprite = evolved_pokemon.sprite
     
     # Handle ability: keep if it exists in evolved form's abilities, otherwise clear it
-    if current_pokemon.ability and evolved_pokemon.abilities:
+    if current_pokemon.ability and evolved_pokemon.abilities: # type: ignore
         if current_pokemon.ability not in evolved_pokemon.abilities:
             current_pokemon.ability = None  # type: ignore
-    elif not evolved_pokemon.abilities or len(evolved_pokemon.abilities) == 0:
+    elif not evolved_pokemon.abilities or len(evolved_pokemon.abilities) == 0: # type: ignore
         # If evolved form has no abilities, clear it
         current_pokemon.ability = None  # type: ignore
 

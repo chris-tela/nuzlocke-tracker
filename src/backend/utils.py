@@ -213,26 +213,25 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
     # check if location area exists, if not, check if location exists, otherwise return function
  
     if route.startswith(region_name + "-route") and not route.__contains__("area"):
-        route += "-area"
+        route_with_area = route + "-area"
 
     try:
-        route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route.lower()}").json()
+        route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route_with_area.lower()}").json()
+    # three scenarios:
+    # 1. location is a sea-route, needs a 'sea' prefix
+    # 2. location has multiple areas, needs a get_location
+    # 3. neither 1 or 2 is true, thus route has no encounters.
     except Exception as e:
-        # account for sea routes ex : johto-route-40-area --> johto-sea-route-40-area
-        if route.__contains__("route") and not route.__contains__("-sea-"):
-            sea_route = route[:len(region_name)] + "-sea" + route[len(region_name):]
-            try:
-                sea_encounters = get_encounters(sea_route, region_name, version_name)
-                if(not sea_encounters is None):
-                    return sea_encounters
-            except Exception as e:
-                    raise Exception("Location contains no encounters")
-            
         try:
-            return get_location(route, region_name, version_name)
-        except Exception as e:
-            raise Exception("Location contains no encounters")
-        
+            route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route.lower()}").json()
+        except Exception:
+            try:
+                print(route)
+                return get_location(route, region_name, version_name)
+            except Exception:
+                print("get location exception")
+
+ 
             
     try:
         encounters = route_area["pokemon_encounters"]
@@ -254,9 +253,10 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                     if(max_level < details["max_level"]):
                         max_level = details["max_level"]
                     method = details["method"]["name"]
+                    chance = details["chance"]
                     if(not encounter_method.__contains__(method)):
                         encounter_method.append(method)
-                encounter_data.append([name, min_level, max_level, version_name, region_name, encounter_method])
+                encounter_data.append([name, min_level, max_level, version_name, region_name, encounter_method, chance])
     if encounter_data == []:
         raise Exception("Location contains no encounters")
     return encounter_data
@@ -266,13 +266,16 @@ function is used when a location has multiple areas, all containing encounters t
 used as a 'helper' for get_encounters
 '''
 def get_location(loc: str, region: str,  version: str) -> list[list]:
+
     location = requests.get(f"https://pokeapi.co/api/v2/location/{loc.lower()}").json()
     try:
         areas = location["areas"]
     except Exception as e:
+        print("no area")
         raise Exception("Location contains no areas: " + str(e))
     
     if len(areas) <= 1:
+        print("one area, no condensed needed")
         raise Exception("Location contains one or none areas, and does not need to be condensed")
     
 
@@ -283,9 +286,10 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
             area_encounter = get_encounters(area["name"], region, version)
             areas_encounters.append(area_encounter)
         except Exception as e:
+            print("exception through within location --> area")
             continue
 
-
+    print(areas_encounters)
 
     if len(areas_encounters) == 0:
         raise Exception()
@@ -304,7 +308,9 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
                 pokemon_list.append(pokemon)
                 min_level = areas_encounters[x][y][1]
                 max_level = areas_encounters[x][y][2]
-                condensed_encounters.append([pokemon, min_level, max_level, version, region])
+                method = areas_encounters[x][y][5]
+                chance = areas_encounters[x][y][6]
+                condensed_encounters.append([pokemon, min_level, max_level, version, region, method, chance])
 
             else:
                 # get data for pokemon from condensed_encounters
@@ -316,8 +322,13 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
                             min_level = areas_encounters[x][y][1]
                         if max_level < areas_encounters[x][y][2]:
                             max_level = areas_encounters[x][y][2]
+                    
+                        # grab unique method
+                        method = list(set(areas_encounters[x][y][5] + condensed_encounters[z][5]))
+                        # TODO: chance can have two different values if the chance % differs in different areas inside a location
+                        chance = areas_encounters[x][y][6]
                         condensed_encounters.pop(z)
-                        condensed_encounters.append([pokemon, min_level, max_level, version, region])
+                        condensed_encounters.append([pokemon, min_level, max_level, version, region, method, chance])
                         break
 
     return condensed_encounters

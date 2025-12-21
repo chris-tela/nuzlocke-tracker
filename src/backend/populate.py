@@ -237,6 +237,11 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
             loc_lower = loc.lower()
             data = utils.get_encounters(loc_lower, str(generation.region_name), str(version.version_name))
         except Exception as e:
+            try:
+                sea_route = loc_lower[:len(str(generation.region_name))] + "-sea" + loc_lower[len(str(generation.region_name)):]
+                data = utils.get_encounters(sea_route, str(generation.region_name), str(version.version_name))
+            except Exception:
+                continue
             continue
         try:
             print(loc_lower)
@@ -253,6 +258,16 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
     db.commit()
     db.close()
     return {"message": "Route encounters populated successfully"}
+
+@app.get("/populate/version/{version_name}/routes/{route_name}")
+def route(version_name: str, route_name: str, db: Session = Depends(database.get_db)):
+         
+         data = utils.get_encounters(route_name, "sinnoh", version_name)
+
+         print(data)
+
+         return data
+
 
 
 @app.post("/populate/gyms")

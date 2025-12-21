@@ -40,11 +40,13 @@ export const getRoutes = async (gameFileId: number): Promise<string[]> => {
 
 /**
  * Get encounter data for a route by ID or name
+ * Requires version_id to ensure version-specific encounters
  */
 export const getRouteEncounters = async (
+  versionId: number,
   route: string | number
 ): Promise<RouteDetailResponse> => {
-  return await apiHelpers.get<RouteDetailResponse>(`/api/routes/${route}`);
+  return await apiHelpers.get<RouteDetailResponse>(`/api/routes/${versionId}/${route}`);
 };
 
 /**

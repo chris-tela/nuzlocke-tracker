@@ -7,13 +7,15 @@ export interface RouteProgressResponse {
 }
 
 // Single encounter entry as rendered in CLI view_location:
-// [pokemonName, minLevel, maxLevel, region, methods?]
+// [pokemonName, minLevel, maxLevel, version_name, region_name, methods, chance]
 export interface RouteEncounter {
   pokemon: string;
   min_level: number;
   max_level: number;
+  version_name: string;
   region: string;
   methods?: string[] | string;
+  chance: number;
 }
 
 export interface RouteDetail {

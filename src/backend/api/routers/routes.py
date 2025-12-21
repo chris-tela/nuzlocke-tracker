@@ -29,17 +29,16 @@ async def ordered_route_list(game_file_id: int, user: models.User = Depends(get_
     
 # get encounter data from a route
 # allow route name and route_id 
-@router.get("/{route_}", status_code=200)
-async def get_route_encounters(route_: str, db: Session = Depends(get_db)):
+@router.get("/{version_id}/{route_}", status_code=200)
+async def get_route_encounters(version_id: int, route_: str, db: Session = Depends(get_db)):
     """Get route encounters by route_id (integer) or route_name (string)."""
-    
     # Try to parse as integer first (route_id)
     try:
         route_id = int(route_)
-        route = db.query(models.Route).filter(models.Route.id == route_id).first()
+        route = db.query(models.Route).filter(models.Route.id == route_id, models.Route.version_id == version_id).first()
     except ValueError:
         # If not a number, treat as route_name
-        route = db.query(models.Route).filter(models.Route.name == route_.lower()).first()
+        route = db.query(models.Route).filter(models.Route.name == route_.lower(), models.Route.version_id == version_id).first()
     
     if route is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found!")
