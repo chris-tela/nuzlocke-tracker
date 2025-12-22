@@ -134,7 +134,7 @@ class Version(Base):
     generation_id = Column(Integer, ForeignKey("generation.generation_id"), nullable=False)
     version_id = Column(Integer, primary_key=True, unique=True, nullable=False)
     version_name = Column(String, nullable=False)
-
+    region_name = Column(String, nullable=False)
 
     locations_ordered = Column(ARRAY(String), nullable=False)
     generation = relationship("Generation", back_populates="version")

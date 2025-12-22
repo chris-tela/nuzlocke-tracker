@@ -111,11 +111,11 @@ BLACK_WHITE_LOCATIONS_ORDERED = ["Nuvema Town", "Juniper's Lab", "Route 1", "Acc
 
 BLACK_2_WHITE_2_LOCATIONS_ORDERED = ["Aspertia City", "Route 19", "Floccesy Town", "Route 20", "Floccesy Ranch", "Pledge Grove", "Aspertia Gym",
                         "Virbank City", "Virbank Complex", "Virbank Gym", "Pokéstar Studios", "Castelia City", "Castelia Sewers", "Castelia Gym",
-                        "Route 4", "Desert Resort", "Relic Castle", "Join Avenue", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 16", "Lostlorn Forest"
-                        "Route 5", "Driftveil Drawbridge", "Driftveil City", "Driftveil Gym", "Pokémon World Tournament", "Plasma Frigate", "Relic Passage"
-                        "Route 6", "Mistralton Cave", "Chargestone Cave", "Mistralton City", "Route 7", "Celestial Tower", "Mistralton Gym"
-                        "Lentimas Town", "Strange House", "Reversal Mountain", "Undella Town", "Undella Bay", "Route 13", "Lacunosa Town", "Route 12", "Village Bridge", "Route 11"
-                        "Opelucid City", "Route 9", "Opelucid Gym", "Marine Tube", "Humilau City", "Humilau Gym", "Route 22", "Route 21", "Seaside Cave", "Plasma Frigate", "Giant Chasm"
+                        "Route 4", "Desert Resort", "Relic Castle", "Join Avenue", "Nimbasa City", "Nimbasa Gym", "Anville Town", "Route 16", "Lostlorn Forest",
+                        "Route 5", "Driftveil Drawbridge", "Driftveil City", "Driftveil Gym", "Pokémon World Tournament", "Plasma Frigate", "Relic Passage",
+                        "Route 6", "Mistralton Cave", "Chargestone Cave", "Mistralton City", "Route 7", "Celestial Tower", "Mistralton Gym",
+                        "Lentimas Town", "Strange House", "Reversal Mountain", "Undella Town", "Undella Bay", "Route 13", "Lacunosa Town", "Route 12", "Village Bridge", "Route 11",
+                        "Opelucid City", "Route 9", "Opelucid Gym", "Marine Tube", "Humilau City", "Humilau Gym", "Route 22", "Route 21", "Seaside Cave", "Plasma Frigate", "Giant Chasm",
                         "Route 23", "Victory Road", "The Pokémon League"]
 
 RUBY_SAPPHIRE_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Route 103 (West)", "Route 102", "Petalburg City", "Route 104", "Petalburg Woods",
@@ -211,22 +211,17 @@ def get_region_locations_ordered(location_list: str, region: str) -> list[str]:
 
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
- 
-    if route.startswith(region_name + "-route") and not route.__contains__("area"):
+    if (route.startswith(region_name + "-route") or route.startswith(region_name + "-sea-route")) and not route.__contains__("area"):
         route_with_area = route + "-area"
 
     try:
         route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route_with_area.lower()}").json()
-    # three scenarios:
-    # 1. location is a sea-route, needs a 'sea' prefix
-    # 2. location has multiple areas, needs a get_location
-    # 3. neither 1 or 2 is true, thus route has no encounters.
+    
     except Exception as e:
         try:
             route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route.lower()}").json()
         except Exception:
             try:
-                print(route)
                 return get_location(route, region_name, version_name)
             except Exception:
                 print("get location exception")
@@ -247,13 +242,13 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                 min_level = 100
                 max_level = 1
                 encounter_method = [] # ex. walk, super-rod, etc
+                chance = version["max_chance"]
                 for details in version["encounter_details"]:
                     if(min_level > details["min_level"]):
                         min_level = details["min_level"]
                     if(max_level < details["max_level"]):
                         max_level = details["max_level"]
                     method = details["method"]["name"]
-                    chance = details["chance"]
                     if(not encounter_method.__contains__(method)):
                         encounter_method.append(method)
                 encounter_data.append([name, min_level, max_level, version_name, region_name, encounter_method, chance])
@@ -271,11 +266,9 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
     try:
         areas = location["areas"]
     except Exception as e:
-        print("no area")
         raise Exception("Location contains no areas: " + str(e))
     
     if len(areas) <= 1:
-        print("one area, no condensed needed")
         raise Exception("Location contains one or none areas, and does not need to be condensed")
     
 
@@ -286,10 +279,8 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
             area_encounter = get_encounters(area["name"], region, version)
             areas_encounters.append(area_encounter)
         except Exception as e:
-            print("exception through within location --> area")
             continue
 
-    print(areas_encounters)
 
     if len(areas_encounters) == 0:
         raise Exception()
@@ -325,7 +316,6 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
                     
                         # grab unique method
                         method = list(set(areas_encounters[x][y][5] + condensed_encounters[z][5]))
-                        # TODO: chance can have two different values if the chance % differs in different areas inside a location
                         chance = areas_encounters[x][y][6]
                         condensed_encounters.pop(z)
                         condensed_encounters.append([pokemon, min_level, max_level, version, region, method, chance])

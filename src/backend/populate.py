@@ -192,16 +192,26 @@ def populate_versions(generation_id: int, db: Session = Depends(database.get_db)
         version_ids = []
         for version in url["versions"]:
             vers_id = version["url"].split("/")[-2]
-            print(vers_id)
+            
             exists = db.query(models.Version).filter(models.Version.version_id == vers_id).first()
             if exists:
                 continue
 
             version_names.append(version["name"])
             version_ids.append(vers_id)
+       
         try:
             string = version_group_name.replace("-","_").upper() + "_locations_ordered".upper()
-            locations_ordered = utils.get_region_locations_ordered(string, str(gen.region_name))
+            # hardcode unique cases
+            if version_group_name == "heartgold-soulsilver":
+                region_name = "johto"
+                locations_ordered = utils.get_region_locations_ordered(string, region_name)
+            elif version_group_name == "firered-leafgreen":
+                region_name = "kanto"
+                locations_ordered = utils.get_region_locations_ordered(string, region_name)
+            else:
+                locations_ordered = utils.get_region_locations_ordered(string, str(gen.region_name))
+                region_name = gen.region_name
         except Exception as e:
 
             continue
@@ -212,6 +222,7 @@ def populate_versions(generation_id: int, db: Session = Depends(database.get_db)
                 generation_id = gen.generation_id,
                 version_id = version_ids[i],
                 version_name = version_names[i],
+                region_name = region_name,
                 locations_ordered = locations_ordered
             )
             db.add(version)
@@ -235,16 +246,17 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
     for loc in version.locations_ordered:
         try:
             loc_lower = loc.lower()
-            data = utils.get_encounters(loc_lower, str(generation.region_name), str(version.version_name))
+            data = utils.get_encounters(loc_lower, str(version.region_name), str(version.version_name))
         except Exception as e:
-            try:
-                sea_route = loc_lower[:len(str(generation.region_name))] + "-sea" + loc_lower[len(str(generation.region_name)):]
-                data = utils.get_encounters(sea_route, str(generation.region_name), str(version.version_name))
-            except Exception:
-                continue
+            if loc_lower.__contains__("route"):
+                try:
+                    sea_route = loc_lower[:len(str(version.region_name))] + "-sea" + loc_lower[len(str(version.region_name)):]
+                    print(sea_route)
+                    data = utils.get_encounters(sea_route, str(version.region_name), str(version.version_name))
+                except Exception:
+                    continue
             continue
         try:
-            print(loc_lower)
             route_encounter = models.Route(
                 name = loc_lower,
                 version_id = version.version_id,
@@ -256,17 +268,24 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
             print(f"Error at {loc}: {e}")
             raise HTTPException(status_code=500, detail=f"Error at {loc}: {e}")
     db.commit()
-    db.close()
+    db.close() 
     return {"message": "Route encounters populated successfully"}
 
 @app.get("/populate/version/{version_name}/routes/{route_name}")
 def route(version_name: str, route_name: str, db: Session = Depends(database.get_db)):
          
-         data = utils.get_encounters(route_name, "sinnoh", version_name)
+        try:
+            data = utils.get_encounters(route_name, "kanto", version_name)
+        except Exception:
+            sea_route = route_name[:len(str("kanto"))] + "-sea" + route_name[len(str("kanto")):]
+            print(sea_route)
+            data = utils.get_encounters(sea_route, "kanto", version_name)
 
-         print(data)
 
-         return data
+
+        print(data)
+
+        return data
 
 
 
