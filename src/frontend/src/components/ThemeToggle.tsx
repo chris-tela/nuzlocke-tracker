@@ -2,10 +2,21 @@
  * Theme Toggle Component
  * Button to switch between dark and light mode
  */
+import { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
 export const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <button
@@ -14,7 +25,7 @@ export const ThemeToggle = () => {
         position: 'fixed',
         top: '20px',
         right: '20px',
-        padding: '10px 16px',
+        padding: isMobile ? '8px' : '8px 12px',
         backgroundColor: 'var(--color-bg-card)',
         border: '2px solid var(--color-border)',
         borderRadius: '8px',
@@ -25,7 +36,7 @@ export const ThemeToggle = () => {
         transition: 'all 150ms ease',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
+        gap: '6px',
         zIndex: 1000,
         boxShadow: 'var(--shadow-md)',
       }}
@@ -61,7 +72,7 @@ export const ThemeToggle = () => {
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
           </svg>
-          <span>Light Mode</span>
+          {!isMobile && <span>Light Mode</span>}
         </>
       ) : (
         <>
@@ -77,7 +88,7 @@ export const ThemeToggle = () => {
           >
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </svg>
-          <span>Dark Mode</span>
+          {!isMobile && <span>Dark Mode</span>}
         </>
       )}
     </button>

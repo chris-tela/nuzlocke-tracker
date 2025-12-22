@@ -13,6 +13,7 @@ import { useVersions } from '../hooks/useVersions';
 import { getGameFiles, createGameFile, deleteGameFile } from '../services/gameFileService';
 import { getPokemon } from '../services/pokemonService';
 import { useQueryClient } from '@tanstack/react-query';
+import { getPokemonSpritePath } from '../utils/pokemonSprites';
 
 export const GameFilesPage = () => {
   const navigate = useNavigate();
@@ -588,7 +589,7 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
             >
               {pokemon ? (
                 <img
-                  src={pokemon.sprite}
+                  src={getPokemonSpritePath(pokemon.name)}
                   alt={pokemon.nickname || pokemon.name}
                   style={{
                     width: '100%',

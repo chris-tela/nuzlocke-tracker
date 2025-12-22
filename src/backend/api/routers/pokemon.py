@@ -112,9 +112,8 @@ def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
         level = pokemon.level,
         gender = pokemon.gender,
         status = pokemon.status,
-        evolution_data = pokemon_data.evolution_data,
-        sprite = pokemon_data.sprite
-    )
+        evolution_data = pokemon_data.evolution_data    
+        )
 
     db.add(pokemon_to_db)
     db.commit()
@@ -248,7 +247,6 @@ def evolve(current_pokemon: models.OwnedPokemon, evolved_pokemon: models.AllPoke
     current_pokemon.poke_id = evolved_pokemon.poke_id
     current_pokemon.types = evolved_pokemon.types
     current_pokemon.evolution_data = evolved_pokemon.evolution_data
-    current_pokemon.sprite = evolved_pokemon.sprite
     
     # Handle ability: keep if it exists in evolved form's abilities, otherwise clear it
     if current_pokemon.ability and evolved_pokemon.abilities: # type: ignore
@@ -320,9 +318,8 @@ async def get_pokemon_info(
         "base_special_attack": pokemon.base_special_attack,
         "base_special_defense": pokemon.base_special_defense,
         "base_speed": pokemon.base_speed,
-        "evolution_data": pokemon.evolution_data,
-        "sprite": pokemon.sprite
-    }
+        "evolution_data": pokemon.evolution_data    
+        }
 
 @router.get("/name/{pokemon_name}")
 async def get_pokemon_info_by_name(
@@ -350,9 +347,8 @@ async def get_pokemon_info_by_name(
         "base_special_attack": pokemon.base_special_attack,
         "base_special_defense": pokemon.base_special_defense,
         "base_speed": pokemon.base_speed,
-        "evolution_data": pokemon.evolution_data,
-        "sprite": pokemon.sprite
-    }
+        "evolution_data": pokemon.evolution_data    
+        }
 
 
 @router.get("/versions/{version_name}/starters")

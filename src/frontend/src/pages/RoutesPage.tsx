@@ -2,13 +2,100 @@
  * Routes Page
  * Track route progression and log encounters
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
 import { useUpcomingRoutes, useRouteProgress, useRouteEncounters, useAddRouteProgress, useAddPokemonFromRoute } from '../hooks/useRoutes';
 import { usePokemonInfoByName } from '../hooks/usePokemon';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
+import { getPokemonSpritePath } from '../utils/pokemonSprites';
+
+// Lazy loading image component using Intersection Observer
+const LazyImage = ({ 
+  src, 
+  alt, 
+  style,
+  onError 
+}: { 
+  src: string; 
+  alt: string; 
+  style?: React.CSSProperties;
+  onError?: (e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+}) => {
+  const [isInView, setIsInView] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsInView(true);
+            observer.disconnect();
+          }
+        });
+      },
+      {
+        rootMargin: '50px', // Start loading 50px before entering viewport
+      }
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <div ref={imgRef} style={{ ...style, position: 'relative' }}>
+        {isInView && (
+          <img
+            src={src}
+            alt={alt}
+            style={{
+              ...style,
+              opacity: isLoaded ? 1 : 0,
+              transition: 'opacity 0.2s ease-in-out',
+              position: 'relative',
+            }}
+            onLoad={() => setIsLoaded(true)}
+            onError={onError}
+            loading="lazy"
+          />
+        )}
+        {!isLoaded && isInView && (
+          <div
+            style={{
+              ...style,
+              backgroundColor: 'var(--color-bg-light)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+            }}
+          >
+            <div
+              style={{
+                width: '20px',
+                height: '20px',
+                border: '2px solid var(--color-border)',
+                borderTopColor: 'var(--color-pokemon-primary)',
+                borderRadius: '50%',
+                animation: 'spin 0.6s linear infinite',
+              }}
+            />
+          </div>
+        )}
+      </div>
+  );
+};
 
 // Helper function to get encounter method icon path
 const getEncounterMethodIcon = (method: string): string | null => {
@@ -39,7 +126,7 @@ const getEncounterMethodIcon = (method: string): string | null => {
 };
 
 // Component to display Pokemon sprite with loading state
-const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
+const PokemonSprite = memo(({ pokemonName }: { pokemonName: string }) => {
   const { data: pokemonInfo, isLoading } = usePokemonInfoByName(pokemonName.toLowerCase());
 
   if (isLoading) {
@@ -62,7 +149,7 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
     );
   }
 
-  if (!pokemonInfo?.sprite) {
+  if (!pokemonInfo?.name) {
     return (
       <div
         style={{
@@ -93,10 +180,11 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
-      <img
-        src={pokemonInfo.sprite}
+      <LazyImage
+        src={getPokemonSpritePath(pokemonInfo.name)}
         alt={pokemonName}
         style={{
           width: '100%',
@@ -110,15 +198,17 @@ const PokemonSprite = ({ pokemonName }: { pokemonName: string }) => {
       />
     </div>
   );
-};
+});
+
+PokemonSprite.displayName = 'PokemonSprite';
 
 // Component for individual encounter card with types
-const EncounterCard = ({
+const EncounterCard = memo(({
   encounter,
   isClickable,
   onLogEncounterWithPokemon,
 }: {
-  encounter: { pokemon: string; minLevel: number; maxLevel: number; methods?: string[]; chance?: number };
+  encounter: { pokemon: string; minLevel: number; maxLevel: number; encounterMethods?: Record<string, number> };
   isClickable: boolean;
   onLogEncounterWithPokemon: (pokemonName: string) => void;
 }) => {
@@ -193,75 +283,119 @@ const EncounterCard = ({
             fontSize: '0.85rem',
             color: 'var(--color-text-primary)',
             fontWeight: 500,
+            marginBottom: '4px',
           }}
         >
           Lv. {encounter.minLevel}
           {encounter.maxLevel !== encounter.minLevel
             ? `-${encounter.maxLevel}`
             : ''}
-          {encounter.chance !== undefined && (
-            <>, {encounter.chance}%</>
-          )}
         </div>
-        {encounter.methods && Array.isArray(encounter.methods) && encounter.methods.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '6px',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              marginTop: '4px',
-            }}
-          >
-            {encounter.methods.map((method, index) => {
-              const iconPath = getEncounterMethodIcon(method);
-              return (
-                <div
-                  key={index}
+        {encounter.encounterMethods && Object.keys(encounter.encounterMethods).length > 0 && (() => {
+          const methodEntries = Object.entries(encounter.encounterMethods);
+          const methodCount = methodEntries.length;
+          const useTwoColumns = methodCount > 2;
+          const midPoint = Math.ceil(methodCount / 2);
+          const firstColumn = methodEntries.slice(0, midPoint);
+          const secondColumn = methodEntries.slice(midPoint);
+
+          const renderMethod = ([method, chance]: [string, number]) => {
+            const iconPath = getEncounterMethodIcon(method);
+            return (
+              <div
+                key={method}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '0.75rem',
+                }}
+              >
+                {iconPath ? (
+                  <img
+                    src={iconPath}
+                    alt={method}
+                    title={method}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      objectFit: 'contain',
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : null}
+                <span
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
+                    color: 'var(--color-text-secondary)',
+                    textTransform: 'capitalize',
                   }}
                 >
-                  {iconPath ? (
-                    <img
-                      src={iconPath}
-                      alt={method}
-                      title={method}
-                      style={{
-                        width: '35px',
-                        height: '35px',
-                        objectFit: 'contain',
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : null}
-                  {!iconPath && (
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--color-text-secondary)',
-                      }}
-                    >
-                      {method}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  {method.replace(/-/g, ' ')}
+                </span>
+                <span
+                  style={{
+                    color: 'var(--color-text-primary)',
+                    fontWeight: 600,
+                  }}
+                >
+                  {chance}%
+                </span>
+              </div>
+            );
+          };
+
+          return (
+            <div
+              style={{
+                display: useTwoColumns ? 'grid' : 'flex',
+                gridTemplateColumns: useTwoColumns ? '1fr 1fr' : undefined,
+                flexDirection: useTwoColumns ? undefined : 'column',
+                gap: '4px',
+                alignItems: 'center',
+                marginTop: '4px',
+                width: '100%',
+              }}
+            >
+              {useTwoColumns ? (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    {firstColumn.map(renderMethod)}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    {secondColumn.map(renderMethod)}
+                  </div>
+                </>
+              ) : (
+                methodEntries.map(renderMethod)
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
-};
+});
+
+EncounterCard.displayName = 'EncounterCard';
 
 // Component to render a single route with its encounters
-const RouteCard = ({
+const RouteCard = memo(({
   routeName,
   isEncountered,
   onMarkAsSeen,
@@ -278,8 +412,9 @@ const RouteCard = ({
 }) => {
   const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(routeName, gameName);
 
-  // Parse encounter data - format: [pokemonName, minLevel, maxLevel, version_name, region_name, methods, chance]
-  const parseEncounters = () => {
+  // Parse encounter data - format: [pokemonName, minLevel, maxLevel, game_name, region_name, {encounter_method: chance}]
+  // Memoize to avoid recalculating on every render
+  const encounters = useMemo(() => {
     if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
       return [];
     }
@@ -287,14 +422,11 @@ const RouteCard = ({
       pokemon: enc[0] || '',
       minLevel: enc[1] || 0,
       maxLevel: enc[2] || 0,
-      version_name: enc[3] || '',
+      game_name: enc[3] || '',
       region: enc[4] || '',
-      methods: enc[5] || [],
-      chance: enc[6] !== undefined ? enc[6] : undefined,
+      encounterMethods: enc[5] && typeof enc[5] === 'object' ? enc[5] : {},
     }));
-  };
-
-  const encounters = parseEncounters();
+  }, [routeEncounters?.data]);
 
   return (
     <div
@@ -377,7 +509,9 @@ const RouteCard = ({
       )}
     </div>
   );
-};
+});
+
+RouteCard.displayName = 'RouteCard';
 
 export const RoutesPage = () => {
   const navigate = useNavigate();
@@ -394,6 +528,10 @@ export const RoutesPage = () => {
   // Visibility toggles
   const [showEncounteredRoutes, setShowEncounteredRoutes] = useState(true);
   const [showUpcomingRoutes, setShowUpcomingRoutes] = useState(true);
+
+  // Infinite scroll state
+  const [displayedEncounteredCount, setDisplayedEncounteredCount] = useState(15);
+  const [displayedUpcomingCount, setDisplayedUpcomingCount] = useState(15);
 
   // Log Encounter Modal State
   const [showCatchModal, setShowCatchModal] = useState(false);
@@ -421,20 +559,57 @@ export const RoutesPage = () => {
     }
   }, [currentGameFile, navigate]);
 
+  // Reset displayed counts when routes data changes
+  useEffect(() => {
+    setDisplayedEncounteredCount(15);
+  }, [encounteredRoutes.length]);
+
+  useEffect(() => {
+    setDisplayedUpcomingCount(15);
+  }, [upcomingRoutes.length]);
+
+  // Infinite scroll handler with throttling
+  useEffect(() => {
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Check if user scrolled near bottom (within 200px)
+          if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200) {
+            // Load more encountered routes if there are more to show
+            if (showEncounteredRoutes && displayedEncounteredCount < encounteredRoutes.length) {
+              setDisplayedEncounteredCount(prev => Math.min(prev + 15, encounteredRoutes.length));
+            }
+            // Load more upcoming routes if there are more to show
+            if (showUpcomingRoutes && displayedUpcomingCount < upcomingRoutes.length) {
+              setDisplayedUpcomingCount(prev => Math.min(prev + 15, upcomingRoutes.length));
+            }
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [showEncounteredRoutes, showUpcomingRoutes, displayedEncounteredCount, displayedUpcomingCount, encounteredRoutes.length, upcomingRoutes.length]);
+
   if (!currentGameFile || !gameFileId) {
     return null;
   }
 
-  const handleMarkAsSeen = async (routeName: string) => {
+  const handleMarkAsSeen = useCallback(async (routeName: string) => {
     try {
       setError(null);
       await addRouteProgressMutation.mutateAsync(routeName);
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to confirm route');
     }
-  };
+  }, [addRouteProgressMutation]);
 
-  const handleOpenCatchModal = (routeName: string, pokemonName?: string) => {
+  const handleOpenCatchModal = useCallback((routeName: string, pokemonName?: string) => {
     setSelectedRoute(routeName);
     setShowCatchModal(true);
     setError(null);
@@ -445,10 +620,10 @@ export const RoutesPage = () => {
     setAbility('');
     setGender('');
     setStatus(Status.PARTY);
-  };
+  }, []);
 
-  // Helper function to get min level for a Pokemon
-  const getMinLevelForPokemon = (pokemonName: string): number | null => {
+  // Helper function to get min level for a Pokemon - memoized
+  const getMinLevelForPokemon = useCallback((pokemonName: string): number | null => {
     if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
       return null;
     }
@@ -456,7 +631,7 @@ export const RoutesPage = () => {
       (enc: any) => enc[0]?.toLowerCase() === pokemonName.toLowerCase()
     ) as any;
     return encounter && encounter[1] ? encounter[1] : null;
-  };
+  }, [routeEncounters?.data]);
 
   // Update level when Pokemon is selected from dropdown or when routeEncounters loads
   useEffect(() => {
@@ -468,7 +643,7 @@ export const RoutesPage = () => {
     }
   }, [showCatchModal, selectedPokemonName, routeEncounters]);
 
-  const handleCloseCatchModal = () => {
+  const handleCloseCatchModal = useCallback(() => {
     setShowCatchModal(false);
     setError(null);
     setSelectedRoute(null);
@@ -479,9 +654,9 @@ export const RoutesPage = () => {
     setAbility('');
     setGender('');
     setStatus(Status.PARTY);
-  };
+  }, []);
 
-  const handleSubmitCatch = async (e: React.FormEvent) => {
+  const handleSubmitCatch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRoute || !selectedPokemonName) {
       setError('Please select a Pokemon');
@@ -502,10 +677,9 @@ export const RoutesPage = () => {
         pokemon: enc[0] || '',
         minLevel: enc[1] || 0,
         maxLevel: enc[2] || 0,
-        version_name: enc[3] || '',
+        game_name: enc[3] || '',
         region: enc[4] || '',
-        methods: enc[5] || [],
-        chance: enc[6] !== undefined ? enc[6] : undefined,
+        encounterMethods: enc[5] && typeof enc[5] === 'object' ? enc[5] : {},
       }));
     };
 
@@ -555,10 +729,10 @@ export const RoutesPage = () => {
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to add Pokemon');
     }
-  };
+  }, [selectedRoute, selectedPokemonName, nickname, nature, ability, level, gender, status, pokemonInfo, routeEncounters, encounteredRoutes, addPokemonFromRouteMutation, addRouteProgressMutation, handleCloseCatchModal]);
 
-  // Parse encounters for the modal
-  const parseEncounters = () => {
+  // Parse encounters for the modal - memoized
+  const encounters = useMemo(() => {
     if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
       return [];
     }
@@ -566,14 +740,11 @@ export const RoutesPage = () => {
       pokemon: enc[0] || '',
       minLevel: enc[1] || 0,
       maxLevel: enc[2] || 0,
-      version_name: enc[3] || '',
+      game_name: enc[3] || '',
       region: enc[4] || '',
-      methods: enc[5] || [],
-      chance: enc[6] !== undefined ? enc[6] : undefined,
+      encounterMethods: enc[5] && typeof enc[5] === 'object' ? enc[5] : {},
     }));
-  };
-
-  const encounters = parseEncounters();
+  }, [routeEncounters?.data]);
 
   return (
     <div
@@ -596,32 +767,50 @@ export const RoutesPage = () => {
         <div
           style={{
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: '12px',
             position: 'sticky',
             top: '20px',
             zIndex: 10,
             backgroundColor: 'var(--color-bg-light)',
             padding: '12px 0',
             marginBottom: '8px',
+            paddingRight: '60px', // Account for theme toggle on mobile
           }}
         >
-          <h1
+          <div
             style={{
-              color: 'var(--color-text-primary)',
-              fontSize: '1.8rem',
-              margin: 0,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '12px',
             }}
           >
-            Routes
-          </h1>
-          <button
-            className="btn btn-outline"
-            onClick={() => navigate('/dashboard')}
-            style={{ fontSize: '0.9rem', padding: '8px 16px' }}
-          >
-            {'<-'} Back to Dashboard
-          </button>
+            <h1
+              style={{
+                color: 'var(--color-text-primary)',
+                fontSize: '1.8rem',
+                margin: 0,
+                flex: 1,
+                minWidth: 0, // Allow text to shrink if needed
+              }}
+            >
+              Routes
+            </h1>
+            <button
+              className="btn btn-outline"
+              onClick={() => navigate('/dashboard')}
+              style={{
+                fontSize: '0.9rem',
+                padding: '8px 16px',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                zIndex: 11, // Ensure it's above theme toggle
+              }}
+            >
+              {'<-'} Back to Dashboard
+            </button>
+          </div>
         </div>
 
         {/* Encountered Routes Section */}
@@ -673,7 +862,7 @@ export const RoutesPage = () => {
               </p>
             ) : (
               <div>
-                {encounteredRoutes.map((routeName) => (
+                {encounteredRoutes.slice(0, displayedEncounteredCount).map((routeName) => (
                   <RouteCard
                     key={routeName}
                     routeName={routeName}
@@ -684,6 +873,17 @@ export const RoutesPage = () => {
                     gameName={gameName}
                   />
                 ))}
+                {displayedEncounteredCount < encounteredRoutes.length && (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '20px',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  >
+                    Loading more routes...
+                  </div>
+                )}
               </div>
             )
           )}
@@ -738,7 +938,7 @@ export const RoutesPage = () => {
               </p>
             ) : (
               <div>
-                {upcomingRoutes.map((routeName) => (
+                {upcomingRoutes.slice(0, displayedUpcomingCount).map((routeName) => (
                   <RouteCard
                     key={routeName}
                     routeName={routeName}
@@ -749,6 +949,17 @@ export const RoutesPage = () => {
                     gameName={gameName}
                   />
                 ))}
+                {displayedUpcomingCount < upcomingRoutes.length && (
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '20px',
+                      color: 'var(--color-text-secondary)',
+                    }}
+                  >
+                    Loading more routes...
+                  </div>
+                )}
               </div>
             )
           )}

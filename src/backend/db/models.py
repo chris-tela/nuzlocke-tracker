@@ -55,7 +55,6 @@ class AllPokemon(Base):
     base_special_defense = Column(Integer, nullable=False)
     base_speed = Column(Integer, nullable=False)
     evolution_data = Column(ARRAY(JSON), nullable=True)
-    sprite = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
 
 
@@ -75,7 +74,6 @@ class OwnedPokemon(Base):
     gender = Column(String, nullable=True)
     status = Column(Enum(Status), nullable=False)
     evolution_data = Column(ARRAY(JSON), nullable=True)
-    sprite = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
 
     pokemon = relationship("AllPokemon")

@@ -62,7 +62,6 @@ class PokemonBase(BaseModel):
     gender: Optional[str] = None
     status: Status
     evolution_data: Optional[List[Dict[str, Any]]] = None
-    sprite: str
     created_at: Optional[datetime] = None
 
     class Config:

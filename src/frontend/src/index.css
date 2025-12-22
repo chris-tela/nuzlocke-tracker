@@ -52,3 +52,12 @@ button:focus-visible {
 }
 
 /* Color scheme is now controlled by design-system.css and ThemeContext */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

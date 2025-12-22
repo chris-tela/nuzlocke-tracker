@@ -15,7 +15,6 @@ export interface Pokemon {
   level: number;
   gender?: string | null;
   status: StatusValue | string;
-  sprite: string;
   evolution_data?: EvolutionData[] | null;
   created_at?: string | null;
 }
@@ -43,7 +42,6 @@ export interface BasePokemon {
   base_special_defense: number;
   base_speed: number;
   evolution_data?: EvolutionData[] | null;
-  sprite: string;
   created_at: string;
 }
 

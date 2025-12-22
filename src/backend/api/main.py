@@ -4,6 +4,7 @@ Separate from populate.py and cli.py - this is the web API layer.
 """
 import os
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -39,6 +40,13 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# Mount static files for assets (sprites, etc.)
+# Get the backend directory path (parent of api directory)
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+assets_path = os.path.join(backend_dir, "assets")
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])

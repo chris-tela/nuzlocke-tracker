@@ -8,6 +8,7 @@ import { useGameFile } from '../hooks/useGameFile';
 import { useGymProgress, useUpcomingGyms, useAddGym, useVersionGyms } from '../hooks/useGyms';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { usePokemonInfoByName } from '../hooks/usePokemon';
+import { getPokemonSpritePath } from '../utils/pokemonSprites';
 
 // Type for gym data from the API
 interface GymData {
@@ -44,7 +45,7 @@ const PokemonSprite = ({ pokemonName, size = 64 }: { pokemonName: string; size?:
     );
   }
 
-  if (!pokemonInfo?.sprite) {
+  if (!pokemonInfo?.name) {
     return (
       <div
         style={{
@@ -78,7 +79,7 @@ const PokemonSprite = ({ pokemonName, size = 64 }: { pokemonName: string; size?:
       }}
     >
       <img
-        src={pokemonInfo.sprite}
+        src={getPokemonSpritePath(pokemonInfo.name)}
         alt={pokemonName}
         style={{
           width: '100%',

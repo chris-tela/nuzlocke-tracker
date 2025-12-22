@@ -63,7 +63,16 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
             break
 
         # insert into database
-        
+        # Convert sprite to webp if sprite URL exists
+        if sprite:
+            try:
+                utils.convert_image_to_webp(sprite, name)
+            except Exception as img_error:
+                print(f"Image conversion error for {name} (ID: {index}): {img_error}")
+                # Continue even if image conversion fails
+        else:
+            print(f"Warning: No sprite found for {name} (ID: {index})")
+
         pokemon = models.AllPokemon(
             id = id,
             poke_id = poke_id,
@@ -78,7 +87,6 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
             base_special_defense = base_special_defense,
             base_speed = base_speed,
             evolution_data = evolution_data,
-            sprite = sprite,
             created_at = created_at
         )
         db.add(pokemon)

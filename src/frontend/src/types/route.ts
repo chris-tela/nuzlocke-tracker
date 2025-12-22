@@ -7,15 +7,14 @@ export interface RouteProgressResponse {
 }
 
 // Single encounter entry as rendered in CLI view_location:
-// [pokemonName, minLevel, maxLevel, version_name, region_name, methods, chance]
+// [pokemonName, minLevel, maxLevel, game_name, region_name, {encounter_method: chance}]
 export interface RouteEncounter {
   pokemon: string;
   min_level: number;
   max_level: number;
-  version_name: string;
+  game_name: string;
   region: string;
-  methods?: string[] | string;
-  chance: number;
+  encounterMethods?: Record<string, number>; // Map of encounter method to chance percentage
 }
 
 export interface RouteDetail {

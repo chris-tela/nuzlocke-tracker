@@ -10,6 +10,7 @@ import { useAddPokemon } from '../hooks/usePokemon';
 import { getGameFile } from '../services/gameFileService';
 import { Nature, Status } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
+import { getPokemonSpritePath } from '../utils/pokemonSprites';
 
 export const StarterSelectionPage = () => {
   const navigate = useNavigate();
@@ -259,7 +260,7 @@ export const StarterSelectionPage = () => {
                     }}
                   >
                     <img
-                      src={starter.sprite}
+                      src={getPokemonSpritePath(starter.name)}
                       alt={starter.name}
                       style={{
                         width: '120px',

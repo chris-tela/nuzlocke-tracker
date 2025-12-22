@@ -5,6 +5,7 @@ import { usePartyPokemon, useStoredPokemon, useFaintedPokemon, useUpdatePokemon,
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import type { Pokemon } from '../types/pokemon';
+import { getPokemonSpritePath } from '../utils/pokemonSprites';
 
 export const TeamPage = () => {
   const navigate = useNavigate();
@@ -389,7 +390,7 @@ export const TeamPage = () => {
                     }}
                   >
                     <img
-                      src={pokemon.sprite}
+                      src={getPokemonSpritePath(pokemon.name)}
                       alt={pokemon.nickname || pokemon.name}
                       style={{
                         width: '100%',
@@ -547,7 +548,7 @@ export const TeamPage = () => {
                     }}
                   >
                     <img
-                      src={pokemon.sprite}
+                      src={getPokemonSpritePath(pokemon.name)}
                       alt={pokemon.nickname || pokemon.name}
                       style={{
                         width: '100%',
@@ -712,7 +713,7 @@ export const TeamPage = () => {
                     }}
                   >
                     <img
-                      src={pokemon.sprite}
+                      src={getPokemonSpritePath(pokemon.name)}
                       alt={pokemon.nickname || pokemon.name}
                       style={{
                         width: '100%',
@@ -1253,7 +1254,7 @@ export const TeamPage = () => {
                         }}
                       >
                         <img
-                          src={partyPoke.sprite}
+                          src={getPokemonSpritePath(partyPoke.name)}
                           alt={partyPoke.nickname || partyPoke.name}
                           style={{
                             width: '100%',
@@ -1519,9 +1520,9 @@ const EvolutionOptionButton = ({
           >
             ...
           </div>
-        ) : pokemonInfo?.sprite ? (
+        ) : pokemonInfo?.name ? (
           <img
-            src={pokemonInfo.sprite}
+            src={getPokemonSpritePath(pokemonInfo.name)}
             alt={species}
             style={{
               width: '100%',

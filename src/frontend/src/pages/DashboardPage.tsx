@@ -6,6 +6,7 @@ import { useUpcomingRoutes } from '../hooks/useRoutes';
 import { useUpcomingGyms, useGymProgress } from '../hooks/useGyms';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import type { Pokemon } from '../types/pokemon';
+import { getPokemonSpritePath } from '../utils/pokemonSprites';
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
@@ -421,7 +422,7 @@ export const DashboardPage = () => {
                   }}
                 >
                   <img
-                    src={pokemon.sprite}
+                    src={getPokemonSpritePath(pokemon.name)}
                     alt={pokemon.nickname || pokemon.name}
                     style={{
                       width: '100%',
