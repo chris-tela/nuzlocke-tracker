@@ -244,29 +244,52 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=404, detail=f"Generation with ID {version.generation_id} not found in database. Please populate the region first.")
     
     for loc in version.locations_ordered:
+        loc_lower = loc.lower()
+        data = None
+        route_name = None
+        
+        # Check if route already exists (either as original or sea route)
+        sea_route = loc_lower[:len(str(version.region_name))] + "-sea" + loc_lower[len(str(version.region_name)):] if loc_lower.__contains__("route") else None
+        existing_route = db.query(models.Route).filter(
+            models.Route.version_id == version.version_id
+        ).filter(
+            (models.Route.name == loc_lower) | (models.Route.name == sea_route) if sea_route else (models.Route.name == loc_lower)
+        ).first()
+        
+        if existing_route:
+            print(f"Route {loc_lower} (or {sea_route}) already exists for version_id {version_id}, skipping...")
+            continue
+        
+        # Try original location first
         try:
-            loc_lower = loc.lower()
             data = utils.get_encounters(loc_lower, str(version.region_name), str(version.version_name))
+            route_name = loc_lower
         except Exception as e:
-            if loc_lower.__contains__("route"):
+            # If it's a route and original fails, try sea route
+            if sea_route:
                 try:
-                    sea_route = loc_lower[:len(str(version.region_name))] + "-sea" + loc_lower[len(str(version.region_name)):]
-                    print(sea_route)
+                    print(f"Trying sea route: {sea_route}")
                     data = utils.get_encounters(sea_route, str(version.region_name), str(version.version_name))
+                    route_name = loc_lower
                 except Exception:
                     continue
-            continue
-        try:
-            route_encounter = models.Route(
-                name = loc_lower,
-                version_id = version.version_id,
-                region_id = generation.region_id,
-                data = data
-            )
-            db.add(route_encounter)
-        except Exception as e:
-            print(f"Error at {loc}: {e}")
-            raise HTTPException(status_code=500, detail=f"Error at {loc}: {e}")
+            else:
+                continue
+        
+        # Add route if we successfully got data
+        if data and route_name:
+            try:
+                print(f"Adding route: {route_name}")
+                route_encounter = models.Route(
+                    name = route_name,
+                    version_id = version.version_id,
+                    region_id = generation.region_id,
+                    data = data
+                )
+                db.add(route_encounter)
+            except Exception as e:
+                print(f"Error at {loc}: {e}")
+                raise HTTPException(status_code=500, detail=f"Error at {loc}: {e}")
     db.commit()
     db.close() 
     return {"message": "Route encounters populated successfully"}

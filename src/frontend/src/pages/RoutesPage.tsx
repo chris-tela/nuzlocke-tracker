@@ -598,6 +598,12 @@ export const RoutesPage = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
+            position: 'sticky',
+            top: '20px',
+            zIndex: 10,
+            backgroundColor: 'var(--color-bg-light)',
+            padding: '12px 0',
+            marginBottom: '8px',
           }}
         >
           <h1
