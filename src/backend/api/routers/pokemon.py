@@ -2,7 +2,8 @@
 Pokemon management router.
 Handles pokemon CRUD operations, evolution, and status management.
 """
-from fastapi import APIRouter, HTTPException, Depends, status
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Depends, status, Query
 from sqlalchemy.orm import Session
 from ..utils import verify_game_file
 from ...db import models
@@ -292,18 +293,58 @@ async def swap_pokemon(pokemon_party_id: int, pokemon_switch_id: int, game_file_
     return perform_swap(partied_pokemon, swap_pokemon, db)
 
 
-@router.get("/{poke_id}")
-async def get_pokemon_info(
-    poke_id: int,
+@router.get("/search")
+async def search_pokemon(
+    query: str,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    """Get base pokemon information by poke_id."""
-    pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.poke_id == poke_id).first()
+    """Search Pokemon by partial name match. Returns list of Pokemon matching the query."""
+    if not query or len(query) < 1:
+        return []
+    
+    # Validate limit
+    if limit < 1 or limit > 50:
+        limit = 10
+    
+    search_term = f"%{query.lower()}%"
+    pokemon_list = db.query(models.AllPokemon).filter(
+        models.AllPokemon.name.ilike(search_term)
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": pokemon.poke_id,  # Use poke_id as id for BasePokemon compatibility
+            "poke_id": pokemon.poke_id,
+            "name": pokemon.name,
+            "types": pokemon.types,
+            "abilities": pokemon.abilities,
+            "weight": pokemon.weight,
+            "base_hp": pokemon.base_hp,
+            "base_attack": pokemon.base_attack,
+            "base_defense": pokemon.base_defense,
+            "base_special_attack": pokemon.base_special_attack,
+            "base_special_defense": pokemon.base_special_defense,
+            "base_speed": pokemon.base_speed,
+            "evolution_data": pokemon.evolution_data,
+            "created_at": pokemon.created_at.isoformat() if pokemon.created_at is not None else datetime.now().isoformat(),
+        }
+        for pokemon in pokemon_list
+    ]
+
+
+@router.get("/name/{pokemon_name}")
+async def get_pokemon_info_by_name(
+    pokemon_name: str,
+    db: Session = Depends(get_db)
+):
+    """Get base pokemon information by name."""
+    pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.name == pokemon_name.lower()).first()
     
     if pokemon is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Pokemon with poke_id {poke_id} not found in database!"
+            detail=f"Pokemon with name '{pokemon_name}' not found in database!"
         )
     
     return {
@@ -321,18 +362,18 @@ async def get_pokemon_info(
         "evolution_data": pokemon.evolution_data    
         }
 
-@router.get("/name/{pokemon_name}")
-async def get_pokemon_info_by_name(
-    pokemon_name: str,
+@router.get("/{poke_id}")
+async def get_pokemon_info(
+    poke_id: int,
     db: Session = Depends(get_db)
 ):
-    """Get base pokemon information by name."""
-    pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.name == pokemon_name.lower()).first()
+    """Get base pokemon information by poke_id."""
+    pokemon = db.query(models.AllPokemon).filter(models.AllPokemon.poke_id == poke_id).first()
     
     if pokemon is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Pokemon with name '{pokemon_name}' not found in database!"
+            detail=f"Pokemon with poke_id {poke_id} not found in database!"
         )
     
     return {
