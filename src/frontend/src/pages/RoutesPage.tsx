@@ -6,7 +6,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
 import { useUpcomingRoutes, useRouteProgress, useRouteEncounters, useAddRouteProgress, useAddPokemonFromRoute } from '../hooks/useRoutes';
-import { usePokemonInfoByName } from '../hooks/usePokemon';
+import { usePokemonInfoByName, usePokemon } from '../hooks/usePokemon';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
@@ -207,45 +207,103 @@ const EncounterCard = memo(({
   encounter,
   isClickable,
   onLogEncounterWithPokemon,
+  isCaught,
+  isCaughtOnThisRoute,
+  isAlreadyOwned,
+  isEncounteredRoute,
 }: {
   encounter: { pokemon: string; minLevel: number; maxLevel: number; encounterMethods?: Record<string, number> };
   isClickable: boolean;
   onLogEncounterWithPokemon: (pokemonName: string) => void;
+  isCaught?: boolean;
+  isCaughtOnThisRoute?: boolean;
+  isAlreadyOwned?: boolean;
+  isEncounteredRoute?: boolean;
 }) => {
   const { data: pokemonInfo } = usePokemonInfoByName(encounter.pokemon.toLowerCase());
 
+  // Only disable/grey out if owned but NOT caught on this route AND it's an upcoming route
+  // In encountered routes, show owned Pokemon normally (not greyed out)
+  const isDisabled = isAlreadyOwned && !isCaught && !isEncounteredRoute;
+  
   return (
     <div
       onClick={() => {
-        if (isClickable) {
+        if (isClickable && !isDisabled) {
           onLogEncounterWithPokemon(encounter.pokemon);
         }
       }}
       style={{
         padding: '16px',
         borderRadius: '12px',
-        border: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-bg-card)',
+        border: isCaught 
+          ? `3px solid ${isCaughtOnThisRoute ? '#9333ea' : 'var(--color-pokemon-primary)'}` 
+          : '1px solid var(--color-border)',
+        backgroundColor: isDisabled ? 'var(--color-bg-light)' : 'var(--color-bg-card)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         gap: '8px',
-        cursor: isClickable ? 'pointer' : 'default',
+        cursor: (isClickable && !isDisabled) ? 'pointer' : (isCaught ? 'default' : 'not-allowed'),
         transition: isClickable ? 'all 150ms ease' : 'none',
+        boxShadow: isCaught 
+          ? `0 0 0 2px ${isCaughtOnThisRoute ? '#9333ea' : 'var(--color-pokemon-primary)'}, 0 4px 6px rgba(0, 0, 0, 0.1)` 
+          : 'none',
+        position: 'relative',
+        opacity: isDisabled ? 0.5 : 1,
+        filter: isDisabled ? 'grayscale(100%)' : 'none',
       }}
       onMouseEnter={(e) => {
-        if (isClickable) {
+        if (isClickable && !isDisabled && !isCaughtOnThisRoute) {
           e.currentTarget.style.borderColor = 'var(--color-pokemon-primary)';
           e.currentTarget.style.backgroundColor = 'var(--color-bg-light)';
         }
       }}
       onMouseLeave={(e) => {
-        if (isClickable) {
-          e.currentTarget.style.borderColor = 'var(--color-border)';
+        if (isClickable && !isDisabled && !isCaughtOnThisRoute) {
+          e.currentTarget.style.borderColor = isCaught 
+            ? (isCaughtOnThisRoute ? '#9333ea' : 'var(--color-pokemon-primary)')
+            : 'var(--color-border)';
           e.currentTarget.style.backgroundColor = 'var(--color-bg-card)';
         }
       }}
     >
+      {isCaught && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            backgroundColor: isCaughtOnThisRoute ? '#9333ea' : 'var(--color-pokemon-primary)',
+            color: 'white',
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            zIndex: 1,
+          }}
+        >
+          ✓ Caught
+        </div>
+      )}
+      {isAlreadyOwned && !isCaught && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            backgroundColor: '#9333ea',
+            color: 'white',
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            padding: '2px 6px',
+            borderRadius: '4px',
+            zIndex: 1,
+          }}
+        >
+          Owned
+        </div>
+      )}
       <PokemonSprite pokemonName={encounter.pokemon} />
       <div
         style={{
@@ -402,6 +460,9 @@ const RouteCard = memo(({
   onLogEncounter,
   onLogEncounterWithPokemon,
   gameName,
+  caughtPokemon,
+  ownedPokemonNames,
+  pokemonCaughtOn,
 }: {
   routeName: string;
   isEncountered: boolean;
@@ -409,6 +470,9 @@ const RouteCard = memo(({
   onLogEncounter: () => void;
   onLogEncounterWithPokemon: (pokemonName: string) => void;
   gameName: string | null;
+  caughtPokemon?: string | null;
+  ownedPokemonNames?: Set<string>;
+  pokemonCaughtOn?: Map<string, string | null>;
 }) => {
   const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(routeName, gameName);
 
@@ -465,12 +529,30 @@ const RouteCard = memo(({
           >
             {encounters.map((encounter, index) => {
               const isClickable = !isEncountered && encounters.length > 0;
+              const pokemonNameLower = encounter.pokemon.toLowerCase();
+              const routeNameLower = routeName.toLowerCase();
+              
+              // Check if caught in this session (temporary state)
+              const isCaughtThisSession = Boolean(isEncountered && caughtPokemon && 
+                pokemonNameLower === caughtPokemon.toLowerCase());
+              
+              // Check if permanently caught on this route (from caught_on field)
+              const caughtOnRoute = pokemonCaughtOn?.get(pokemonNameLower);
+              const isCaughtOnThisRoute = caughtOnRoute?.toLowerCase() === routeNameLower;
+              
+              // Show purple border if permanently caught on this route
+              const isCaught = isCaughtThisSession || isCaughtOnThisRoute;
+              const isAlreadyOwned = Boolean(ownedPokemonNames?.has(pokemonNameLower));
               return (
                 <EncounterCard
                   key={index}
                   encounter={encounter}
                   isClickable={isClickable}
                   onLogEncounterWithPokemon={onLogEncounterWithPokemon}
+                  isCaught={isCaught}
+                  isCaughtOnThisRoute={isCaughtOnThisRoute}
+                  isAlreadyOwned={isAlreadyOwned}
+                  isEncounteredRoute={isEncountered}
                 />
               );
             })}
@@ -521,9 +603,29 @@ export const RoutesPage = () => {
 
   const { data: upcomingRoutes = [], isLoading: isLoadingUpcoming } = useUpcomingRoutes(gameFileId);
   const { data: encounteredRoutes = [], isLoading: isLoadingEncountered } = useRouteProgress(gameFileId);
+  const { data: allOwnedPokemon = [] } = usePokemon(gameFileId);
   
   const addRouteProgressMutation = useAddRouteProgress(gameFileId);
   const addPokemonFromRouteMutation = useAddPokemonFromRoute(gameFileId);
+
+  // Track which Pokemon was caught from each route
+  const [routeCaughtPokemon, setRouteCaughtPokemon] = useState<Record<string, string>>({});
+
+  // Create a set of owned Pokemon names for quick lookup
+  const ownedPokemonNames = useMemo(() => {
+    return new Set(allOwnedPokemon.map(p => p.name.toLowerCase()));
+  }, [allOwnedPokemon]);
+
+  // Create a map of Pokemon names to their caught_on values
+  const pokemonCaughtOn = useMemo(() => {
+    const map = new Map<string, string | null>();
+    allOwnedPokemon.forEach(p => {
+      if (p.name && p.caught_on !== undefined) {
+        map.set(p.name.toLowerCase(), p.caught_on);
+      }
+    });
+    return map;
+  }, [allOwnedPokemon]);
 
   // Visibility toggles
   const [showEncounteredRoutes, setShowEncounteredRoutes] = useState(true);
@@ -714,6 +816,14 @@ export const RoutesPage = () => {
         },
       });
       
+      // Track which Pokemon was caught from this route
+      if (selectedRoute) {
+        setRouteCaughtPokemon(prev => ({
+          ...prev,
+          [selectedRoute]: selectedPokemonName,
+        }));
+      }
+
       // Also mark the route as seen (moves it to encountered routes)
       // Only do this if the route is not already encountered
       if (!encounteredRoutes.includes(selectedRoute)) {
@@ -871,6 +981,9 @@ export const RoutesPage = () => {
                     onLogEncounter={() => handleOpenCatchModal(routeName)}
                     onLogEncounterWithPokemon={(pokemonName) => handleOpenCatchModal(routeName, pokemonName)}
                     gameName={gameName}
+                    caughtPokemon={routeCaughtPokemon[routeName]}
+                    ownedPokemonNames={ownedPokemonNames}
+                    pokemonCaughtOn={pokemonCaughtOn}
                   />
                 ))}
                 {displayedEncounteredCount < encounteredRoutes.length && (
@@ -947,6 +1060,8 @@ export const RoutesPage = () => {
                     onLogEncounter={() => handleOpenCatchModal(routeName)}
                     onLogEncounterWithPokemon={(pokemonName) => handleOpenCatchModal(routeName, pokemonName)}
                     gameName={gameName}
+                    ownedPokemonNames={ownedPokemonNames}
+                    pokemonCaughtOn={pokemonCaughtOn}
                   />
                 ))}
                 {displayedUpcomingCount < upcomingRoutes.length && (
@@ -1041,13 +1156,22 @@ export const RoutesPage = () => {
                     required
                   >
                     <option value="">Select a Pokemon</option>
-                    {encounters.map((encounter, index) => (
-                      <option key={index} value={encounter.pokemon}>
-                        {encounter.pokemon.charAt(0).toUpperCase() + encounter.pokemon.slice(1)} (Lv.{' '}
-                        {encounter.minLevel}
-                        {encounter.maxLevel !== encounter.minLevel ? `-${encounter.maxLevel}` : ''})
-                      </option>
-                    ))}
+                    {encounters.map((encounter, index) => {
+                      const isOwned = ownedPokemonNames.has(encounter.pokemon.toLowerCase());
+                      return (
+                        <option 
+                          key={index} 
+                          value={encounter.pokemon}
+                          disabled={isOwned}
+                          style={isOwned ? { color: '#999', fontStyle: 'italic' } : {}}
+                        >
+                          {encounter.pokemon.charAt(0).toUpperCase() + encounter.pokemon.slice(1)} (Lv.{' '}
+                          {encounter.minLevel}
+                          {encounter.maxLevel !== encounter.minLevel ? `-${encounter.maxLevel}` : ''})
+                          {isOwned ? ' - Already Owned' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 

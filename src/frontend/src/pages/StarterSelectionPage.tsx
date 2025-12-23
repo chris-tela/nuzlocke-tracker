@@ -96,6 +96,7 @@ export const StarterSelectionPage = () => {
         level: level,
         gender: gender || null,
         status: Status.PARTY,
+        caught_on: 'starter',
       });
 
       // Navigate to dashboard after successful starter selection (per Phase 4.3)

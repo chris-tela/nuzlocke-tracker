@@ -15,6 +15,7 @@ export interface Pokemon {
   level: number;
   gender?: string | null;
   status: StatusValue | string;
+  caught_on?: string | null;
   evolution_data?: EvolutionData[] | null;
   created_at?: string | null;
 }

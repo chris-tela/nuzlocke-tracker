@@ -113,6 +113,7 @@ def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
         level = pokemon.level,
         gender = pokemon.gender,
         status = pokemon.status,
+        caught_on = pokemon.caught_on,
         evolution_data = pokemon_data.evolution_data    
         )
 

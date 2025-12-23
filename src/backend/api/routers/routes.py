@@ -8,6 +8,7 @@ from ..utils import verify_game_file
 from ...db import models
 from ..dependencies import get_db, get_current_user
 from ..schemas import PokemonCreate
+from .. import schemas
 from .pokemon import add_pokemon as add_pokemon_to_game
 
 
@@ -186,5 +187,19 @@ async def add_pokemon_from_route(
             detail=f"Pokemon '{full_data_pokemon.name}' is not an encounter on this route.",
         )
 
+    # Set caught_on to the route name
+    # Create a new PokemonCreate with caught_on set to the route name
+    route_name = str(route.name)  # Get the actual string value
+    pokemon_with_route = schemas.PokemonCreate(
+        poke_id=pokemon.poke_id,
+        nickname=pokemon.nickname,
+        nature=pokemon.nature,
+        ability=pokemon.ability,
+        level=pokemon.level,
+        gender=pokemon.gender,
+        status=pokemon.status,
+        caught_on=route_name
+    )
+    
     # Delegate creation to pokemon router logic
-    return add_pokemon_to_game(game_file_id, pokemon, db)
+    return add_pokemon_to_game(game_file_id, pokemon_with_route, db)

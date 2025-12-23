@@ -61,6 +61,7 @@ class PokemonBase(BaseModel):
     level: int = Field(ge=1, le=100)
     gender: Optional[str] = None
     status: Status
+    caught_on: Optional[str] = None
     evolution_data: Optional[List[Dict[str, Any]]] = None
     created_at: Optional[datetime] = None
 
@@ -75,6 +76,7 @@ class PokemonCreate(BaseModel):
     level: int = Field(ge=1, le=100)
     gender: Optional[str] = None
     status: Status = Status.UNKNOWN
+    caught_on: Optional[str] = None
     
     @field_validator('nature', mode='before')
     @classmethod

@@ -73,6 +73,7 @@ class OwnedPokemon(Base):
     level = Column(Integer, nullable=False)
     gender = Column(String, nullable=True)
     status = Column(Enum(Status), nullable=False)
+    caught_on = Column(String, nullable=True)
     evolution_data = Column(ARRAY(JSON), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
 

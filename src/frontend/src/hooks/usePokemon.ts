@@ -9,6 +9,7 @@ import {
   getFaintedPokemon,
   getPokemonInfo,
   getPokemonInfoByName,
+  searchPokemon,
   addPokemon,
   updatePokemon,
   evolvePokemon,
@@ -64,6 +65,15 @@ export const usePokemonInfoByName = (pokemonName: string | null) => {
     queryKey: pokemonName ? ['pokemon', 'info', 'name', pokemonName] : ['pokemon', 'info', 'name', 'disabled'],
     queryFn: () => getPokemonInfoByName(pokemonName!),
     enabled: !!pokemonName,
+  });
+};
+
+export const useSearchPokemon = (query: string | null, limit: number = 10) => {
+  return useQuery({
+    queryKey: query ? ['pokemon', 'search', query, limit] : ['pokemon', 'search', 'disabled'],
+    queryFn: () => searchPokemon(query!, limit),
+    enabled: !!query && query.length >= 1,
+    staleTime: 30000, // Cache for 30 seconds
   });
 };
 

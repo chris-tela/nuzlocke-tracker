@@ -14,6 +14,7 @@ export interface PokemonCreate {
   level: number;
   gender?: string | null;
   status?: StatusValue | string;
+  caught_on?: string | null;
 }
 
 export interface PokemonUpdate {
@@ -127,6 +128,13 @@ export const getPokemonInfo = async (pokeId: number): Promise<BasePokemon> => {
  */
 export const getPokemonInfoByName = async (pokemonName: string): Promise<BasePokemon> => {
   return await apiHelpers.get<BasePokemon>(`/api/pokemon/name/${pokemonName}`);
+};
+
+/**
+ * Search Pokemon by partial name
+ */
+export const searchPokemon = async (query: string, limit: number = 10): Promise<BasePokemon[]> => {
+  return await apiHelpers.get<BasePokemon[]>(`/api/pokemon/search?query=${encodeURIComponent(query)}&limit=${limit}`);
 };
 
 /**
