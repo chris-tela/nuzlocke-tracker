@@ -320,6 +320,45 @@ def route(version_name: str, route_name: str, db: Session = Depends(database.get
 
 
 
+def get_trainer_data_filename_from_game_name(game_name: str) -> str:
+    """
+    Map game_name to the corresponding trainer_data JSON filename.
+    Uses naming convention from scrape/trainer_data directory.
+    """
+    game_name_lower = game_name.lower()
+    
+    # Map game names to trainer_data filenames based on actual file names
+    trainer_data_map = {
+        'red': 'red-blue_trainers.json',
+        'blue': 'red-blue_trainers.json',
+        'yellow': 'yellow_trainers.json',
+        'gold': 'gold-silver_trainers.json',
+        'silver': 'gold-silver_trainers.json',
+        'crystal': 'crystal_trainers.json',
+        'ruby': 'ruby-sapphire_trainers.json',
+        'sapphire': 'ruby-sapphire_trainers.json',
+        'emerald': 'ruby-sapphire_trainers.json',
+        'firered': 'firered-leafgreen_trainers.json',
+        'leafgreen': 'firered-leafgreen_trainers.json',
+        'diamond': 'diamond-pearl_trainers.json',
+        'pearl': 'diamond-pearl_trainers.json',
+        'platinum': 'platinum_trainers.json',
+        'heartgold': 'heartgold-soulsilver_trainers.json',
+        'soulsilver': 'heartgold-soulsilver_trainers.json',
+        'black': 'black-white_trainers.json',
+        'white': 'black-white_trainers.json',
+        'black-2': 'black-white-2_trainers.json',
+        'white-2': 'black-white-2_trainers.json',
+        # Handle PokeAPI naming variations
+        'heart-gold': 'heartgold-soulsilver_trainers.json',
+        'soul-silver': 'heartgold-soulsilver_trainers.json',
+        'fire-red': 'firered-leafgreen_trainers.json',
+        'leaf-green': 'firered-leafgreen_trainers.json',
+    }
+    
+    return trainer_data_map.get(game_name_lower, f'{game_name_lower}_trainers.json')
+
+
 @app.post("/populate/gyms")
 def populate_gyms(db: Session = Depends(database.get_db)):
     """Populate gym table from trainer_data JSON files."""
@@ -342,36 +381,9 @@ def populate_gyms(db: Session = Depends(database.get_db)):
     processed_files = {}
     
     for version in versions:
-        # Get trainer data filename for this version
-        game_name = version.version_name
-        
-        # Special case for black-2 and white-2
-        if game_name in ['black-2', 'white-2']:
-            filename = 'black-white-2_trainers.json'
-        else:
-            # Try to get from version_groups
-            gen = db.query(models.Generation).filter(
-                models.Generation.generation_id == version.generation_id
-            ).first()
-            
-            version_groups_value = getattr(gen, 'version_groups', None) if gen else None
-            if gen and version_groups_value:
-                version_groups = list(version_groups_value) if version_groups_value else []
-                filename = None
-                
-                # Try to find matching version group filename
-                for vg in version_groups:
-                    potential_filename = f'{vg}_trainers.json'
-                    file_path = os.path.join(trainer_data_dir, potential_filename)
-                    if os.path.exists(file_path):
-                        filename = potential_filename
-                        break
-                
-                # Fallback to game_name format
-                if not filename:
-                    filename = f'{game_name}_trainers.json'
-            else:
-                filename = f'{game_name}_trainers.json'
+        # Get trainer data filename for this version using naming convention
+        game_name = str(version.version_name)
+        filename = get_trainer_data_filename_from_game_name(game_name)
         
         # Skip if we've already processed this file for another version
         if filename in processed_files:
