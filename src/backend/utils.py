@@ -147,7 +147,7 @@ EMERALD_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Rou
 "Littleroot Town", "Safari Zone", "Altering Cave", "Desert Underpass","Terra Cave","Marine Cave", "Meteor Falls","Trainer Hill"]
 
 
-ALLOWED_CONDITIONS = ["time-morning", "time-day", "time-night", "season-spring", "season-summer", "season-autumn", "season-winter", "story-progress", "swarm-no", "swarm-yes"]
+ALLOWED_CONDITIONS = ["time-morning", "time-day", "time-night", "season-spring", "season-summer", "season-autumn", "season-winter", "story-progress", "swarm-no", "radio-off", "item-none"]
 
 
  
@@ -210,9 +210,10 @@ def get_region_locations_ordered(location_list: str, region: str) -> list[str]:
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
 
-    print(route)
+    
     if (route.startswith(region_name + "-route") or route.startswith(region_name + "-sea-route")) and not route.__contains__("area"):
         route_with_area = route + "-area"
+        
 
     try:
         route_area = requests.get(f"https://pokeapi.co/api/v2/location-area/{route_with_area.lower()}").json()
@@ -324,7 +325,7 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
             
             if pokemon not in pokemon_list:
                 pokemon_list.append(pokemon)
-                condensed_encounters.append([pokemon, min_level, max_level, version, region, encounter_details])
+                condensed_encounters.append([{"name": pokemon}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": version}, {"region_name": region}, encounter_details])
 
             else:
                 # get data for pokemon from condensed_encounters
@@ -342,7 +343,7 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
                         
                         # Remove old entry and add updated one
                         condensed_encounters.pop(z)
-                        condensed_encounters.append([pokemon, updated_min_level, updated_max_level, version, region, merged_values])
+                        condensed_encounters.append([{"name":pokemon}, {"min_level": updated_min_level}, {"max_level": updated_max_level}, {"game_name": version}, {"region_name": region}, merged_values])
                         break
 
     return condensed_encounters
@@ -401,5 +402,5 @@ def convert_image_to_webp(sprite_url, pokemon_name: str):
 
 
 
-encounters = get_encounters("union-cave", "johto", "heartgold")
-print(json.dumps(encounters, indent=4))
+# encounters = get_encounters("union-cave", "johto", "heartgold")
+# print(json.dumps(encounters, indent=4))

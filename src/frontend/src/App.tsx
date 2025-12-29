@@ -12,6 +12,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TeamPage } from './pages/TeamPage';
 import { RoutesPage } from './pages/RoutesPage';
 import { GymsPage } from './pages/GymsPage';
+import { IconLegendPage } from './pages/IconLegendPage';
 import './App.css';
 
 // Protected Route Component
@@ -90,6 +91,14 @@ function App() {
           element={
             <ProtectedRoute>
               <RoutesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/icon-legend"
+          element={
+            <ProtectedRoute>
+              <IconLegendPage />
             </ProtectedRoute>
           }
         />

@@ -178,9 +178,9 @@ async def add_pokemon_from_route(
         )
 
     # Ensure this pokemon can actually be encountered on this route
-    # route.data entries look like: [pokemon_name, min_level, max_level, region, ...]
+    # route.data format: [[{"name": pokemon_name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": game_name}, {"region_name": region_name}, [encounter_details...]], ...]
     route_data_value = getattr(route, "data", None)
-    encounter_names = {enc[0] for enc in (route_data_value or [])}
+    encounter_names = {enc[0].get("name") for enc in (route_data_value or []) if enc and len(enc) > 0 and isinstance(enc[0], dict) and "name" in enc[0]}
     if full_data_pokemon.name not in encounter_names:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

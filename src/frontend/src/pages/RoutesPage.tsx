@@ -125,6 +125,29 @@ const getEncounterMethodIcon = (method: string): string | null => {
   return methodIcons[methodLower] || null;
 };
 
+// Helper function to get condition icon path
+const getConditionIcon = (condition: string): string | null => {
+  const conditionLower = condition.toLowerCase();
+  
+  // Handle story-progress conditions (anything that starts with "story-progress")
+  if (conditionLower.startsWith('story-progress')) {
+    return '/images/conditions/story-progress.png';
+  }
+  
+  // Map conditions to their icon paths
+  const conditionIcons: Record<string, string> = {
+    'time-morning': '/images/conditions/time-morning.png',
+    'time-day': '/images/conditions/time-day.png',
+    'time-night': '/images/conditions/time-night.png',
+    'season-spring': '/images/conditions/season-spring.png',
+    'season-summer': '/images/conditions/season-summer.png',
+    'season-autumn': '/images/conditions/season-autumn.png',
+    'season-winter': '/images/conditions/season-winter.png',
+  };
+  
+  return conditionIcons[conditionLower] || null;
+};
+
 // Component to display Pokemon sprite with loading state
 const PokemonSprite = memo(({ pokemonName }: { pokemonName: string }) => {
   const { data: pokemonInfo, isLoading } = usePokemonInfoByName(pokemonName.toLowerCase());
@@ -357,11 +380,22 @@ const EncounterCard = memo(({
           const firstColumn = methodEntries.slice(0, midPoint);
           const secondColumn = methodEntries.slice(midPoint);
 
-          const renderMethod = ([method, chance]: [string, number]) => {
-            const iconPath = getEncounterMethodIcon(method);
+          const renderMethod = ([methodDisplay, chance]: [string, number]) => {
+            // Extract just the method name for icon lookup (before " (" if condition exists)
+            // e.g., "walk (time-morning)" -> "walk" for icon lookup
+            const methodForIcon = methodDisplay.split(' (')[0];
+            // Extract condition text if it exists (between " (" and ")")
+            const hasCondition = methodDisplay.includes(' (');
+            const conditionText = hasCondition 
+              ? methodDisplay.split(' (')[1].replace(/\)$/, '').trim()
+              : null;
+            const methodIconPath = getEncounterMethodIcon(methodForIcon);
+            // Only get condition icon if conditionText exists and is not null/undefined/empty
+            const conditionIconPath = conditionText && conditionText !== 'null' ? getConditionIcon(conditionText) : null;
+            
             return (
               <div
-                key={method}
+                key={methodDisplay}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -369,11 +403,35 @@ const EncounterCard = memo(({
                   fontSize: '0.75rem',
                 }}
               >
-                {iconPath ? (
+                {methodIconPath ? (
                   <img
-                    src={iconPath}
-                    alt={method}
-                    title={method}
+                    src={methodIconPath}
+                    alt={methodForIcon}
+                    title={methodForIcon}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      objectFit: 'contain',
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span
+                    style={{
+                      color: 'var(--color-text-secondary)',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {methodForIcon.replace(/-/g, ' ')}
+                  </span>
+                )}
+                {conditionIconPath ? (
+                  <img
+                    src={conditionIconPath}
+                    alt={conditionText || ''}
+                    title={conditionText ? conditionText.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''}
                     style={{
                       width: '24px',
                       height: '24px',
@@ -384,14 +442,6 @@ const EncounterCard = memo(({
                     }}
                   />
                 ) : null}
-                <span
-                  style={{
-                    color: 'var(--color-text-secondary)',
-                    textTransform: 'capitalize',
-                  }}
-                >
-                  {method.replace(/-/g, ' ')}
-                </span>
                 <span
                   style={{
                     color: 'var(--color-text-primary)',
@@ -476,20 +526,42 @@ const RouteCard = memo(({
 }) => {
   const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(routeName, gameName);
 
-  // Parse encounter data - format: [pokemonName, minLevel, maxLevel, game_name, region_name, {encounter_method: chance}]
+  // Parse encounter data - format: [[{"name": pokemon_name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": game_name}, {"region_name": region_name}, [encounter_details...]], ...]
   // Memoize to avoid recalculating on every render
   const encounters = useMemo(() => {
     if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
       return [];
     }
-    return routeEncounters.data.map((enc: any) => ({
-      pokemon: enc[0] || '',
-      minLevel: enc[1] || 0,
-      maxLevel: enc[2] || 0,
-      game_name: enc[3] || '',
-      region: enc[4] || '',
-      encounterMethods: enc[5] && typeof enc[5] === 'object' ? enc[5] : {},
-    }));
+    return routeEncounters.data.map((enc: any) => {
+      // Convert encounter methods array to Record<string, number> format
+      // New format: [{"method": method_name, "condition": condition, "chance": chance}, ...]
+      // Convert to: { "method_name (condition)": chance, ... } or { "method_name": chance, ... }
+      let encounterMethods: Record<string, number> = {};
+      if (Array.isArray(enc[5])) {
+        enc[5].forEach((methodDetail: any) => {
+          if (methodDetail && typeof methodDetail === 'object' && methodDetail.method) {
+            const method = methodDetail.method;
+            const condition = methodDetail.condition;
+            const chance = typeof methodDetail.chance === 'number' ? methodDetail.chance : 0;
+            
+            // Create key: "method" or "method (condition)" if condition exists
+            const key = condition ? `${method} (${condition})` : method;
+            
+            // Sum chances if the same key appears multiple times (shouldn't happen, but handle it)
+            encounterMethods[key] = (encounterMethods[key] || 0) + chance;
+          }
+        });
+      }
+      
+      return {
+        pokemon: (enc[0] && typeof enc[0] === 'object' && enc[0].name) ? enc[0].name : '',
+        minLevel: (enc[1] && typeof enc[1] === 'object' && typeof enc[1].min_level === 'number') ? enc[1].min_level : 0,
+        maxLevel: (enc[2] && typeof enc[2] === 'object' && typeof enc[2].max_level === 'number') ? enc[2].max_level : 0,
+        game_name: (enc[3] && typeof enc[3] === 'object' && enc[3].game_name) ? enc[3].game_name : '',
+        region: (enc[4] && typeof enc[4] === 'object' && enc[4].region_name) ? enc[4].region_name : '',
+        encounterMethods: encounterMethods,
+      };
+    });
   }, [routeEncounters?.data]);
 
   return (
@@ -730,9 +802,11 @@ export const RoutesPage = () => {
       return null;
     }
     const encounter = routeEncounters.data.find(
-      (enc: any) => enc[0]?.toLowerCase() === pokemonName.toLowerCase()
+      (enc: any) => enc[0] && typeof enc[0] === 'object' && enc[0].name && enc[0].name.toLowerCase() === pokemonName.toLowerCase()
     ) as any;
-    return encounter && encounter[1] ? encounter[1] : null;
+    return encounter && encounter[1] && typeof encounter[1] === 'object' && typeof encounter[1].min_level === 'number' 
+      ? encounter[1].min_level 
+      : null;
   }, [routeEncounters?.data]);
 
   // Update level when Pokemon is selected from dropdown or when routeEncounters loads
@@ -775,14 +849,30 @@ export const RoutesPage = () => {
       if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
         return [];
       }
-      return routeEncounters.data.map((enc: any) => ({
-        pokemon: enc[0] || '',
-        minLevel: enc[1] || 0,
-        maxLevel: enc[2] || 0,
-        game_name: enc[3] || '',
-        region: enc[4] || '',
-        encounterMethods: enc[5] && typeof enc[5] === 'object' ? enc[5] : {},
-      }));
+      return routeEncounters.data.map((enc: any) => {
+        // Convert encounter methods array to Record<string, number> format
+        let encounterMethods: Record<string, number> = {};
+        if (Array.isArray(enc[5])) {
+          enc[5].forEach((methodDetail: any) => {
+            if (methodDetail && typeof methodDetail === 'object' && methodDetail.method) {
+              const method = methodDetail.method;
+              const condition = methodDetail.condition;
+              const chance = typeof methodDetail.chance === 'number' ? methodDetail.chance : 0;
+              const key = condition ? `${method} (${condition})` : method;
+              encounterMethods[key] = (encounterMethods[key] || 0) + chance;
+            }
+          });
+        }
+        
+        return {
+          pokemon: (enc[0] && typeof enc[0] === 'object' && enc[0].name) ? enc[0].name : '',
+          minLevel: (enc[1] && typeof enc[1] === 'object' && typeof enc[1].min_level === 'number') ? enc[1].min_level : 0,
+          maxLevel: (enc[2] && typeof enc[2] === 'object' && typeof enc[2].max_level === 'number') ? enc[2].max_level : 0,
+          game_name: (enc[3] && typeof enc[3] === 'object' && enc[3].game_name) ? enc[3].game_name : '',
+          region: (enc[4] && typeof enc[4] === 'object' && enc[4].region_name) ? enc[4].region_name : '',
+          encounterMethods: encounterMethods,
+        };
+      });
     };
 
     const encounters = parseEncounters();
@@ -846,14 +936,30 @@ export const RoutesPage = () => {
     if (!routeEncounters?.data || !Array.isArray(routeEncounters.data)) {
       return [];
     }
-    return routeEncounters.data.map((enc: any) => ({
-      pokemon: enc[0] || '',
-      minLevel: enc[1] || 0,
-      maxLevel: enc[2] || 0,
-      game_name: enc[3] || '',
-      region: enc[4] || '',
-      encounterMethods: enc[5] && typeof enc[5] === 'object' ? enc[5] : {},
-    }));
+    return routeEncounters.data.map((enc: any) => {
+      // Convert encounter methods array to Record<string, number> format
+      let encounterMethods: Record<string, number> = {};
+      if (Array.isArray(enc[5])) {
+        enc[5].forEach((methodDetail: any) => {
+          if (methodDetail && typeof methodDetail === 'object' && methodDetail.method) {
+            const method = methodDetail.method;
+            const condition = methodDetail.condition;
+            const chance = typeof methodDetail.chance === 'number' ? methodDetail.chance : 0;
+            const key = condition ? `${method} (${condition})` : method;
+            encounterMethods[key] = (encounterMethods[key] || 0) + chance;
+          }
+        });
+      }
+      
+      return {
+        pokemon: (enc[0] && typeof enc[0] === 'object' && enc[0].name) ? enc[0].name : '',
+        minLevel: (enc[1] && typeof enc[1] === 'object' && typeof enc[1].min_level === 'number') ? enc[1].min_level : 0,
+        maxLevel: (enc[2] && typeof enc[2] === 'object' && typeof enc[2].max_level === 'number') ? enc[2].max_level : 0,
+        game_name: (enc[3] && typeof enc[3] === 'object' && enc[3].game_name) ? enc[3].game_name : '',
+        region: (enc[4] && typeof enc[4] === 'object' && enc[4].region_name) ? enc[4].region_name : '',
+        encounterMethods: encounterMethods,
+      };
+    });
   }, [routeEncounters?.data]);
 
   return (
@@ -907,19 +1013,39 @@ export const RoutesPage = () => {
             >
               Routes
             </h1>
-            <button
-              className="btn btn-outline"
-              onClick={() => navigate('/dashboard')}
+            <div
               style={{
-                fontSize: '0.9rem',
-                padding: '8px 16px',
-                whiteSpace: 'nowrap',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center',
                 flexShrink: 0,
-                zIndex: 11, // Ensure it's above theme toggle
               }}
             >
-              {'<-'} Back to Dashboard
-            </button>
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/icon-legend')}
+                style={{
+                  fontSize: '0.9rem',
+                  padding: '8px 16px',
+                  whiteSpace: 'nowrap',
+                  zIndex: 11, // Ensure it's above theme toggle
+                }}
+              >
+                Icon Legend
+              </button>
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate('/dashboard')}
+                style={{
+                  fontSize: '0.9rem',
+                  padding: '8px 16px',
+                  whiteSpace: 'nowrap',
+                  zIndex: 11, // Ensure it's above theme toggle
+                }}
+              >
+                {'<-'} Back to Dashboard
+              </button>
+            </div>
           </div>
         </div>
 

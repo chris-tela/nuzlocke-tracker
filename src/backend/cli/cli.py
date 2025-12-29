@@ -593,12 +593,21 @@ def view_location(location_name: str):
     for encounter in data_value:
         print("--------------")
         print(str(counter) + ":")
-        print("Pokemon: " + encounter[0])
-        print("Min Level: " + str(encounter[1]))
-        print("Max Level: " + str(encounter[2]))
-        print("Region: " + encounter[3])
-        if len(encounter) == 5:
-            print("Methods of catching: " + str(encounter[4]))
+        # New format: [[{"name": pokemon_name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": game_name}, {"region_name": region_name}, [encounter_details...]], ...]
+        pokemon_name = encounter[0].get("name", "") if encounter and len(encounter) > 0 and isinstance(encounter[0], dict) else (encounter[0] if encounter and len(encounter) > 0 else "")
+        min_level = encounter[1].get("min_level", 0) if encounter and len(encounter) > 1 and isinstance(encounter[1], dict) else (encounter[1] if encounter and len(encounter) > 1 else 0)
+        max_level = encounter[2].get("max_level", 0) if encounter and len(encounter) > 2 and isinstance(encounter[2], dict) else (encounter[2] if encounter and len(encounter) > 2 else 0)
+        game_name = encounter[3].get("game_name", "") if encounter and len(encounter) > 3 and isinstance(encounter[3], dict) else (encounter[3] if encounter and len(encounter) > 3 else "")
+        region_name = encounter[4].get("region_name", "") if encounter and len(encounter) > 4 and isinstance(encounter[4], dict) else (encounter[4] if encounter and len(encounter) > 4 else "")
+        encounter_methods = encounter[5] if encounter and len(encounter) > 5 and isinstance(encounter[5], list) else []
+        
+        print("Pokemon: " + str(pokemon_name))
+        print("Min Level: " + str(min_level))
+        print("Max Level: " + str(max_level))
+        print("Game: " + str(game_name))
+        print("Region: " + str(region_name))
+        if encounter_methods:
+            print("Methods of catching: " + str(encounter_methods))
         print("--------------")
         counter += 1
     print("Did you catch any pokemon on this route? (y=yes)")
@@ -612,7 +621,12 @@ def view_location(location_name: str):
                 print("Pokemon data not found!")
             else:
                 break
-        pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == pokemon[0]).first()
+        # Extract pokemon name from new format: [{"name": pokemon_name}, ...]
+        pokemon_name = pokemon[0].get("name", "") if pokemon and len(pokemon) > 0 and isinstance(pokemon[0], dict) else (pokemon[0] if pokemon and len(pokemon) > 0 else "")
+        min_level = pokemon[1].get("min_level", 0) if pokemon and len(pokemon) > 1 and isinstance(pokemon[1], dict) else (pokemon[1] if pokemon and len(pokemon) > 1 else 0)
+        max_level = pokemon[2].get("max_level", 0) if pokemon and len(pokemon) > 2 and isinstance(pokemon[2], dict) else (pokemon[2] if pokemon and len(pokemon) > 2 else 0)
+        
+        pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.name == pokemon_name).first()
         if pokemon_data is None:
             print("Error finding pokemon data in database!")
             return
@@ -620,7 +634,7 @@ def view_location(location_name: str):
         if id is None:
             print("Error finding game file id!")
             return
-        data = add_to_team(pokemon_data, id, int(pokemon[1]), int(pokemon[2]))
+        data = add_to_team(pokemon_data, id, int(min_level), int(max_level))
         add_to_party_database(data, id, db)
     confirm_location_view(location_name)
             
