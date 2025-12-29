@@ -1,7 +1,10 @@
+from ast import Dict
 import requests
 import re
 from PIL import Image
 import io
+import json
+from sqlalchemy import true
 
 # locations orderd in a playthrough format (scraped from bulbapedia)
 
@@ -144,6 +147,8 @@ EMERALD_LOCATIONS_ORDERED = ["Littleroot Town", "Route 101", "Oldale Town", "Rou
 "Littleroot Town", "Safari Zone", "Altering Cave", "Desert Underpass","Terra Cave","Marine Cave", "Meteor Falls","Trainer Hill"]
 
 
+ALLOWED_CONDITIONS = ["time-morning", "time-day", "time-night", "season-spring", "season-summer", "season-autumn", "season-winter", "story-progress", "swarm-no", "swarm-yes"]
+
 
  
 # goal: organize the locations by start of the game to finished in a walkthrough format
@@ -201,18 +206,11 @@ def get_region_locations_ordered(location_list: str, region: str) -> list[str]:
 
 # goal:
 # write a function that takes a route and returns a list of pokemon that can be encountered
-# 1. include its min level & max level
-# 2. include the encounter method (dark grass, etc)
-# 3. have a list for each version of the game (black, white, black2, etc)
-# output: [[pokemon, min_level, max_level, version], [pokemon, min_level, max_level, version], ...]
-
-# [[liepard, 19, 21, black], [liepard, 19, 23, white-2]]
-# location_area --> pokemon_encounters[list] --> pokemon --> name
-#                                            --> version_details[list] --> version
-#                                                                      --> encounter_details[list] --> min_level (iterated), max_level (iterated), method
 
 def get_encounters(route: str, region_name: str, version_name: str) -> list[list]:
     # check if location area exists, if not, check if location exists, otherwise return function
+
+    print(route)
     if (route.startswith(region_name + "-route") or route.startswith(region_name + "-sea-route")) and not route.__contains__("area"):
         route_with_area = route + "-area"
 
@@ -243,21 +241,40 @@ def get_encounters(route: str, region_name: str, version_name: str) -> list[list
                 name = encounter["pokemon"]["name"]
                 min_level = 100
                 max_level = 1
-                encounter_method_chance = {} # ex: walk: 30% chance of encountering pokemon
-
+                encounter_details = []
+                skip_pokemon = False
+                
+                    
                 for details in version["encounter_details"]:
+                    try: 
+                        condition = details["condition_values"][0]["name"]
+                    except Exception:
+                        condition = None
+                    # if conditon is a condition listed but not supported, skip full pokemon instance
+                    if not(condition in ALLOWED_CONDITIONS or condition is None or condition.startswith("story-progress")):
+                        skip_pokemon = True
+                        break
+
                     min_level = min(min_level, details["min_level"])
                     max_level = max(max_level, details["max_level"])
 
                     chance = int(details["chance"])
                     method = details["method"]["name"]
 
-                    # if method not seen OR higher chance found
-                    if method not in encounter_method_chance or chance > encounter_method_chance[method]:
-                        encounter_method_chance[method] = chance
+                    # if detail already has the same method & condition --> is chance higher? --> YES: keep higher chance, NO: skip
+                    add_to_details = True
+                    for enc in encounter_details:
+                        if enc["method"] == method and enc["condition"] == condition:
+                            enc["chance"] += chance
+                            add_to_details = False
+                    if add_to_details:
+                        encounter_details.append({"method": method, "condition": condition, "chance": chance})
+
+                        
 
                     
-                encounter_data.append([name, min_level, max_level, version_name, region_name, encounter_method_chance])
+                if not skip_pokemon:
+                    encounter_data.append([{"name": name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": version_name}, {"region_name": region_name}, encounter_details])
     if encounter_data == []:
         raise Exception("Location contains no encounters")
     return encounter_data
@@ -267,7 +284,7 @@ function is used when a location has multiple areas, all containing encounters t
 used as a 'helper' for get_encounters
 '''
 def get_location(loc: str, region: str,  version: str) -> list[list]:
-
+    print("test")
     location = requests.get(f"https://pokeapi.co/api/v2/location/{loc.lower()}").json()
     try:
         areas = location["areas"]
@@ -278,7 +295,7 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
         raise Exception("Location contains one or none areas, and does not need to be condensed")
     
 
-
+    print("test3")
     areas_encounters = []
     for area in areas:
         try:
@@ -293,62 +310,62 @@ def get_location(loc: str, region: str,  version: str) -> list[list]:
     # condense areas_encounters into a single list
     # iterate through each pokemon, find its min and max level across all areas and add to condensed_encounters
 
-    '''
-    [[[pokemon, min, max, version], [pokemon, min, max, version]], ]]
-    '''
+   
     condensed_encounters = []
     pokemon_list = []
     for x in range(len(areas_encounters)):
         for y in range(len(areas_encounters[x])):
-            pokemon = areas_encounters[x][y][0]
+            print("test4")
+            # Extract values from dictionary structure: [{"name": name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": version_name}, {"region_name": region_name}, encounter_details]
+            pokemon = areas_encounters[x][y][0]["name"]
+            min_level = areas_encounters[x][y][1]["min_level"]
+            max_level = areas_encounters[x][y][2]["max_level"]
+            encounter_details = areas_encounters[x][y][5]  # This is already a list of dictionaries
+            
             if pokemon not in pokemon_list:
                 pokemon_list.append(pokemon)
-                min_level = areas_encounters[x][y][1]
-                max_level = areas_encounters[x][y][2]
-                method_chance = areas_encounters[x][y][5]
-                condensed_encounters.append([pokemon, min_level, max_level, version, region, method_chance])
+                condensed_encounters.append([pokemon, min_level, max_level, version, region, encounter_details])
 
             else:
                 # get data for pokemon from condensed_encounters
                 for z in range(len(condensed_encounters)):
                     if condensed_encounters[z][0] == pokemon:
-                        min_level = condensed_encounters[z][1]
-                        max_level = condensed_encounters[z][2]
-                        if min_level > areas_encounters[x][y][1]:
-                            min_level = areas_encounters[x][y][1]
-                        if max_level < areas_encounters[x][y][2]:
-                            max_level = areas_encounters[x][y][2]
-                    
-                        # merge method_chance dictionaries, keeping the higher chance for each method
-                        existing_method_chance = condensed_encounters[z][5]
-                        new_method_chance = areas_encounters[x][y][5]
-                        merged_method_chance = existing_method_chance.copy()
+                        existing_min_level = condensed_encounters[z][1]
+                        existing_max_level = condensed_encounters[z][2]
+                        # Update min/max levels - take the minimum min_level and maximum max_level
+                        updated_min_level = min(existing_min_level, min_level)
+                        updated_max_level = max(existing_max_level, max_level)
+                        print("tset2")
+                        existing_encounter_details = condensed_encounters[z][5]
                         
-                        for method, chance in new_method_chance.items():
-                            # If method not seen OR higher chance found, update it
-                            if method not in merged_method_chance or chance > merged_method_chance[method]:
-                                merged_method_chance[method] = chance
+                        merged_values = merge_encounters(existing_encounter_details, encounter_details)
                         
+                        # Remove old entry and add updated one
                         condensed_encounters.pop(z)
-                        condensed_encounters.append([pokemon, min_level, max_level, version, region, merged_method_chance])
+                        condensed_encounters.append([pokemon, updated_min_level, updated_max_level, version, region, merged_values])
                         break
 
     return condensed_encounters
 
+def merge_encounters(list1, list2):
+    merged = {}
+
+    for enc in list1 + list2:
+        key = (enc["method"], enc["condition"])
+
+        if key not in merged:
+            merged[key] = enc.copy()
+        else:
+            # keep highest chance between duplicate method conditions
+            merged[key]["chance"] = max(
+                merged[key]["chance"],
+                enc["chance"]
+            )
+
+    return list(merged.values())
 
 def convert_image_to_webp(sprite_url, pokemon_name: str):
-    """
-    Convert a sprite image from URL to WebP format and save it locally.
-    
-    Args:
-        sprite_url: URL of the sprite image
-        pokemon_name: Name of the Pokemon (used for filename)
-    
-    Raises:
-        ValueError: If sprite_url is None or empty
-        requests.RequestException: If the image download fails
-        PIL.UnidentifiedImageError: If the downloaded content is not a valid image
-    """
+
     if not sprite_url:
         raise ValueError(f"Sprite URL is None or empty for {pokemon_name}")
     
@@ -384,5 +401,5 @@ def convert_image_to_webp(sprite_url, pokemon_name: str):
 
 
 
-#print(get_encounters("kanto-route-19-area", "kanto", "red"))
-
+encounters = get_encounters("union-cave", "johto", "heartgold")
+print(json.dumps(encounters, indent=4))
