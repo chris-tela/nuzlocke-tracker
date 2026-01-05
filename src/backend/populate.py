@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi import FastAPI, Depends, HTTPException
 from db import models, database
-import utils
+import utils, route
 
 head = os.getenv("HEAD")
 app = FastAPI()
@@ -270,14 +270,14 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
         
         # Try original location first
         try:
-            data = utils.get_encounters(loc_lower, str(version.region_name), str(version.version_name))
+            data = route.get_encounters(loc_lower, str(version.region_name), str(version.version_name))
             route_name = loc_lower
         except Exception as e:
             # If it's a route and original fails, try sea route
             if sea_route:
                 try:
                     print(f"Trying sea route: {sea_route}")
-                    data = utils.get_encounters(sea_route, str(version.region_name), str(version.version_name))
+                    data = route.get_encounters(sea_route, str(version.region_name), str(version.version_name))
                     route_name = loc_lower
                 except Exception:
                     continue
@@ -285,38 +285,38 @@ def populate_route(version_id: int, db: Session = Depends(database.get_db)):
                 continue
         
         # Add route if we successfully got data
-        if data and route_name:
-            try:
-                print(f"Adding route: {route_name}")
-                route_encounter = models.Route(
-                    name = route_name,
-                    version_id = version.version_id,
-                    region_id = generation.region_id,
-                    data = data
-                )
-                db.add(route_encounter)
-            except Exception as e:
-                print(f"Error at {loc}: {e}")
-                raise HTTPException(status_code=500, detail=f"Error at {loc}: {e}")
+        # if data and route_name:
+        #     try:
+        #         print(f"Adding route: {route_name}")
+        #         route_encounter = models.Route(
+        #             name = route_name,
+        #             version_id = version.version_id,
+        #             region_id = generation.region_id,
+        #             data = data
+        #         )
+        #         db.add(route_encounter)
+        #     except Exception as e:
+        #         print(f"Error at {loc}: {e}")
+        #         raise HTTPException(status_code=500, detail=f"Error at {loc}: {e}")
     db.commit()
     db.close() 
     return {"message": "Route encounters populated successfully"}
 
-@app.get("/populate/version/{version_name}/routes/{route_name}")
-def route(version_name: str, route_name: str, db: Session = Depends(database.get_db)):
+# @app.get("/populate/version/{version_name}/routes/{route_name}")
+# def route(version_name: str, route_name: str, db: Session = Depends(database.get_db)):
          
-        try:
-            data = utils.get_encounters(route_name, "kanto", version_name)
-        except Exception:
-            sea_route = route_name[:len(str("kanto"))] + "-sea" + route_name[len(str("kanto")):]
-            print(sea_route)
-            data = utils.get_encounters(sea_route, "kanto", version_name)
+#         try:
+#             data = utils.get_encounters(route_name, "kanto", version_name)
+#         except Exception:
+#             sea_route = route_name[:len(str("kanto"))] + "-sea" + route_name[len(str("kanto")):]
+#             print(sea_route)
+#             data = utils.get_encounters(sea_route, "kanto", version_name)
 
 
 
-        print(data)
+#         print(data)
 
-        return data
+#         return data
 
 
 

@@ -22,11 +22,11 @@ app = FastAPI(
 
 # CORS configuration for frontend communication
 # Update allowed_origins in production to specific frontend URL
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://192.168.0.126:5173")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[FRONTEND_URL, "http://192.168.0.126:3000", "http://192.168.0.126:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

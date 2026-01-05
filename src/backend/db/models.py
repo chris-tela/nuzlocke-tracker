@@ -146,6 +146,7 @@ class Route(Base):
     name = Column(String, nullable=False)  # e.g. "Route 1"
     version_id = Column(Integer, ForeignKey("version.version_id"), nullable=False)
     region_id = Column(Integer, ForeignKey("generation.region_id"), nullable=False)
+    derives_from = Column(String, nullable=True)
     data = Column(JSON, nullable=False)
 
     generation = relationship("Generation", back_populates="route")
