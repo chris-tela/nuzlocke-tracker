@@ -7,6 +7,9 @@ import type { AxiosInstance, AxiosError, AxiosResponse } from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+// Log the API base URL for debugging
+console.log(`[API Config] Using API Base URL: ${API_BASE_URL}`);
+
 // Token storage key
 const TOKEN_STORAGE_KEY = 'nuzlocke_auth_token';
 
@@ -49,6 +52,8 @@ const createApiInstance = (): AxiosInstance => {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
+      // Log request for debugging
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
       return config;
     },
     (error) => {
@@ -58,10 +63,16 @@ const createApiInstance = (): AxiosInstance => {
 
   // Response interceptor: handle 401/403 errors
   instance.interceptors.response.use(
-    (response) => response,
+    (response) => {
+      // Log successful responses for debugging
+      console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+      return response;
+    },
     (error: AxiosError) => {
+      // Log errors for debugging
       if (error.response) {
         const status = error.response.status;
+        console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${status}`, error.response.data);
         
         // Handle authentication errors
         if (status === 401 || status === 403) {
@@ -73,6 +84,12 @@ const createApiInstance = (): AxiosInstance => {
             window.location.href = '/login';
           }
         }
+      } else if (error.request) {
+        // Request was made but no response received
+        console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} - No response from server`, error.message);
+      } else {
+        // Error setting up the request
+        console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} - Request setup failed`, error.message);
       }
       
       return Promise.reject(error);

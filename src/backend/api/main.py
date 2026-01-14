@@ -3,9 +3,11 @@ Main FastAPI application for Nuzlocke Tracker API.
 Separate from populate.py and cli.py - this is the web API layer.
 """
 import os
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -20,13 +22,42 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Request logging middleware
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time.time()
+        
+        # Log incoming request
+        method = request.method
+        path = request.url.path
+        query_params = str(request.query_params) if request.query_params else ""
+        full_path = f"{path}?{query_params}" if query_params else path
+        
+        print(f"[REQUEST] {method} {full_path}")
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Calculate processing time
+        process_time = time.time() - start_time
+        
+        # Log response
+        status_code = response.status_code
+        status_emoji = "✅" if 200 <= status_code < 300 else "❌" if status_code >= 400 else "⚠️"
+        print(f"[RESPONSE] {status_emoji} {method} {full_path} - {status_code} ({process_time:.3f}s)")
+        
+        return response
+
+# Add logging middleware (before CORS so it logs all requests)
+app.add_middleware(LoggingMiddleware)
+
 # CORS configuration for frontend communication
 # Update allowed_origins in production to specific frontend URL
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://192.168.0.126:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://192.168.0.126:3000", "http://192.168.0.126:5173"],
+    allow_origins=[FRONTEND_URL, "http://localhost:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,9 +68,6 @@ app.add_middleware(
 async def root():
     return {"message": "Nuzlocke Tracker API", "version": "1.0.0"}
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
 
 # Mount static files for assets (sprites, etc.)
 # Get the backend directory path (parent of api directory)

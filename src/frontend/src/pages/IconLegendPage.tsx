@@ -370,19 +370,19 @@ export const IconLegendPage = () => {
               right: '24px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
-              maxWidth: '220px',
+              gap: '16px',
+              maxWidth: '280px',
             }}
           >
             {/* Level Explanation */}
             <div
               style={{
-                padding: '10px 12px',
+                padding: '14px 16px',
                 backgroundColor: 'var(--color-bg-light)',
                 borderRadius: '8px',
                 border: '1px solid var(--color-border)',
-                fontSize: '0.8rem',
-                lineHeight: '1.4',
+                fontSize: '0.9rem',
+                lineHeight: '1.5',
                 color: 'var(--color-text-secondary)',
               }}
             >
@@ -392,26 +392,26 @@ export const IconLegendPage = () => {
             {/* Walk + Time Morning Explanation */}
             <div
               style={{
-                padding: '10px 12px',
+                padding: '14px 16px',
                 backgroundColor: 'var(--color-bg-light)',
                 borderRadius: '8px',
                 border: '1px solid var(--color-border)',
-                fontSize: '0.8rem',
-                lineHeight: '1.4',
+                fontSize: '0.9rem',
+                lineHeight: '1.5',
                 color: 'var(--color-text-secondary)',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '8px',
+                gap: '10px',
               }}
             >
-              <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginTop: '2px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginTop: '2px' }}>
                 {getEncounterMethodIcon('walk') && (
                   <img
                     src={getEncounterMethodIcon('walk')!}
                     alt="walk"
                     style={{
-                      width: '20px',
-                      height: '20px',
+                      width: '24px',
+                      height: '24px',
                       objectFit: 'contain',
                     }}
                   />
@@ -421,8 +421,8 @@ export const IconLegendPage = () => {
                     src={getConditionIcon('time-morning')!}
                     alt="time-morning"
                     style={{
-                      width: '20px',
-                      height: '20px',
+                      width: '24px',
+                      height: '24px',
                       objectFit: 'contain',
                     }}
                   />
@@ -436,26 +436,26 @@ export const IconLegendPage = () => {
             {/* Surf + Time Night Explanation */}
             <div
               style={{
-                padding: '10px 12px',
+                padding: '14px 16px',
                 backgroundColor: 'var(--color-bg-light)',
                 borderRadius: '8px',
                 border: '1px solid var(--color-border)',
-                fontSize: '0.8rem',
-                lineHeight: '1.4',
+                fontSize: '0.9rem',
+                lineHeight: '1.5',
                 color: 'var(--color-text-secondary)',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: '8px',
+                gap: '10px',
               }}
             >
-              <div style={{ display: 'flex', gap: '4px', flexShrink: 0, marginTop: '2px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0, marginTop: '2px' }}>
                 {getEncounterMethodIcon('surf') && (
                   <img
                     src={getEncounterMethodIcon('surf')!}
                     alt="surf"
                     style={{
-                      width: '20px',
-                      height: '20px',
+                      width: '24px',
+                      height: '24px',
                       objectFit: 'contain',
                     }}
                   />
@@ -465,8 +465,8 @@ export const IconLegendPage = () => {
                     src={getConditionIcon('time-night')!}
                     alt="time-night"
                     style={{
-                      width: '20px',
-                      height: '20px',
+                      width: '24px',
+                      height: '24px',
                       objectFit: 'contain',
                     }}
                   />
