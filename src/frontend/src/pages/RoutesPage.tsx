@@ -5,7 +5,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
-import { useUpcomingRoutes, useRouteProgress, useRouteEncounters, useAddRouteProgress, useAddPokemonFromRoute } from '../hooks/useRoutes';
+import { useUpcomingRoutes, useRouteProgress, useRouteEncounters, useAddRouteProgress, useAddPokemonFromRoute, useDerivedRoutes, useParentRoute } from '../hooks/useRoutes';
+import { getParentRoute } from '../services/routeService';
 import { usePokemonInfoByName, usePokemon } from '../hooks/usePokemon';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
@@ -510,21 +511,42 @@ const RouteCard = memo(({
   onLogEncounter,
   onLogEncounterWithPokemon,
   gameName,
+  gameFileId,
   caughtPokemon,
   ownedPokemonNames,
   pokemonCaughtOn,
+  encounteredRoutes = [],
 }: {
   routeName: string;
   isEncountered: boolean;
   onMarkAsSeen: () => void;
-  onLogEncounter: () => void;
-  onLogEncounterWithPokemon: (pokemonName: string) => void;
+  onLogEncounter: (actualRouteName?: string) => void;
+  onLogEncounterWithPokemon: (pokemonName: string, actualRouteName?: string) => void;
   gameName: string | null;
+  gameFileId: number | null;
   caughtPokemon?: string | null;
   ownedPokemonNames?: Set<string>;
   pokemonCaughtOn?: Map<string, string | null>;
+  encounteredRoutes?: string[];
 }) => {
-  const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(routeName, gameName);
+  const [selectedDerivedRoute, setSelectedDerivedRoute] = useState<string | null>(null);
+  const { data: derivedRoutes = [], isLoading: isLoadingDerived } = useDerivedRoutes(gameFileId, routeName);
+  
+  // Filter out derived routes that are already encountered
+  const availableDerivedRoutes = useMemo(() => {
+    return derivedRoutes.filter(route => !encounteredRoutes.includes(route));
+  }, [derivedRoutes, encounteredRoutes]);
+  
+  // Reset selectedDerivedRoute if it's now in encounteredRoutes
+  useEffect(() => {
+    if (selectedDerivedRoute && encounteredRoutes.includes(selectedDerivedRoute)) {
+      setSelectedDerivedRoute(null);
+    }
+  }, [selectedDerivedRoute, encounteredRoutes]);
+  
+  const displayRouteName = selectedDerivedRoute || routeName;
+  const { data: routeEncounters, isLoading: isLoadingEncounters } = useRouteEncounters(displayRouteName, gameName);
+
 
   // Parse encounter data - format: [[{"name": pokemon_name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": game_name}, {"region_name": region_name}, [encounter_details...]], ...]
   // Memoize to avoid recalculating on every render
@@ -572,17 +594,65 @@ const RouteCard = memo(({
         marginBottom: '16px',
       }}
     >
-      <h3
+      <div
         style={{
-          color: 'var(--color-text-primary)',
-          fontSize: '1.2rem',
-          marginTop: 0,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
           marginBottom: '20px',
-          fontWeight: 600,
+          gap: '12px',
+          flexWrap: 'wrap',
         }}
       >
-        {routeName}
-      </h3>
+        <h3
+          style={{
+            color: 'var(--color-text-primary)',
+            fontSize: '1.2rem',
+            marginTop: 0,
+            marginBottom: 0,
+            fontWeight: 600,
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          {displayRouteName}
+        </h3>
+        {availableDerivedRoutes.length > 0 && (
+          <select
+            value={selectedDerivedRoute || ''}
+            onChange={(e) => setSelectedDerivedRoute(e.target.value || null)}
+            className="input"
+            style={{
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              minWidth: '200px',
+              maxWidth: '300px',
+              width: 'auto',
+              backgroundColor: 'var(--color-bg-card)',
+              color: 'var(--color-text-primary)',
+            }}
+            onFocus={(e) => {
+              e.target.style.backgroundColor = 'var(--color-bg-card)';
+            }}
+            onBlur={(e) => {
+              e.target.style.backgroundColor = 'var(--color-bg-card)';
+            }}
+          >
+            <option value="" style={{ backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }}>
+              {routeName} (Main)
+            </option>
+            {availableDerivedRoutes.map((derivedRoute) => (
+              <option 
+                key={derivedRoute} 
+                value={derivedRoute}
+                style={{ backgroundColor: 'var(--color-bg-card)', color: 'var(--color-text-primary)' }}
+              >
+                {derivedRoute}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {isLoadingEncounters ? (
         <p style={{ color: 'var(--color-text-secondary)' }}>Loading encounters...</p>
@@ -602,7 +672,7 @@ const RouteCard = memo(({
             {encounters.map((encounter, index) => {
               const isClickable = !isEncountered && encounters.length > 0;
               const pokemonNameLower = encounter.pokemon.toLowerCase();
-              const routeNameLower = routeName.toLowerCase();
+              const routeNameLower = displayRouteName.toLowerCase();
               
               // Check if caught in this session (temporary state)
               const isCaughtThisSession = Boolean(isEncountered && caughtPokemon && 
@@ -620,7 +690,10 @@ const RouteCard = memo(({
                   key={index}
                   encounter={encounter}
                   isClickable={isClickable}
-                  onLogEncounterWithPokemon={onLogEncounterWithPokemon}
+                  onLogEncounterWithPokemon={(pokemonName) => {
+                    const routeToUse = selectedDerivedRoute || routeName;
+                    onLogEncounterWithPokemon(pokemonName, routeToUse);
+                  }}
                   isCaught={isCaught}
                   isCaughtOnThisRoute={isCaughtOnThisRoute}
                   isAlreadyOwned={isAlreadyOwned}
@@ -646,7 +719,11 @@ const RouteCard = memo(({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={onLogEncounter}
+              onClick={() => {
+                // Use the selected derived route if one is selected, otherwise use the original route
+                const routeToUse = selectedDerivedRoute || routeName;
+                onLogEncounter(routeToUse);
+              }}
             >
               Log Encounter
             </button>
@@ -719,6 +796,14 @@ export const RoutesPage = () => {
   const [status, setStatus] = useState<StatusValue | ''>(Status.PARTY);
   const [error, setError] = useState<string | null>(null);
 
+  // Log Full Area Confirmation Modal State
+  const [showLogFullAreaModal, setShowLogFullAreaModal] = useState(false);
+  const [pendingRouteAction, setPendingRouteAction] = useState<{
+    route: string;
+    parentRoute: string;
+    action: 'markAsSeen' | 'submitCatch';
+  } | null>(null);
+
   const level = parseInt(levelInput, 10) || 0;
 
   // Fetch Pokemon info for ability dropdown when a Pokemon is selected
@@ -777,13 +862,46 @@ export const RoutesPage = () => {
   const handleMarkAsSeen = useCallback(async (routeName: string) => {
     try {
       setError(null);
-      await addRouteProgressMutation.mutateAsync(routeName);
+      
+      // Check if this is a derived route
+      if (gameFileId) {
+        try {
+          const parentRouteInfo = await getParentRoute(gameFileId, routeName);
+          
+          if (parentRouteInfo.is_derived && parentRouteInfo.parent_route) {
+            // Check if parent route is already encountered
+            const isParentEncountered = encounteredRoutes.includes(parentRouteInfo.parent_route);
+            
+            if (!isParentEncountered) {
+              // Show confirmation modal instead of browser popup
+              setPendingRouteAction({
+                route: routeName,
+                parentRoute: parentRouteInfo.parent_route,
+                action: 'markAsSeen',
+              });
+              setShowLogFullAreaModal(true);
+              return;
+            } else {
+              // Parent already encountered, just add the derived route
+              await addRouteProgressMutation.mutateAsync({ route: routeName, includeParent: false });
+            }
+          } else {
+            // Regular route, add normally
+            await addRouteProgressMutation.mutateAsync({ route: routeName, includeParent: false });
+          }
+        } catch (parentCheckError: any) {
+          // If checking parent fails, just try to add the route normally
+          // (might be a regular route that doesn't exist in the route table yet)
+          await addRouteProgressMutation.mutateAsync({ route: routeName, includeParent: false });
+        }
+      }
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to confirm route');
     }
-  }, [addRouteProgressMutation]);
+  }, [addRouteProgressMutation, gameFileId, encounteredRoutes]);
 
   const handleOpenCatchModal = useCallback((routeName: string, pokemonName?: string) => {
+    // routeName can be either the original route or a derived route
     setSelectedRoute(routeName);
     setShowCatchModal(true);
     setError(null);
@@ -914,22 +1032,47 @@ export const RoutesPage = () => {
         }));
       }
 
-      // Also mark the route as seen (moves it to encountered routes)
-      // Only do this if the route is not already encountered
-      if (!encounteredRoutes.includes(selectedRoute)) {
+      // Check if this is a derived route and handle parent route logging
+      if (selectedRoute && !encounteredRoutes.includes(selectedRoute) && gameFileId) {
         try {
-          await addRouteProgressMutation.mutateAsync(selectedRoute);
+          const parentRouteInfo = await getParentRoute(gameFileId, selectedRoute);
+          
+          if (parentRouteInfo.is_derived && parentRouteInfo.parent_route) {
+            // Check if parent route is already encountered
+            const isParentEncountered = encounteredRoutes.includes(parentRouteInfo.parent_route);
+            
+            if (!isParentEncountered) {
+              // Show confirmation modal instead of browser popup
+              setPendingRouteAction({
+                route: selectedRoute,
+                parentRoute: parentRouteInfo.parent_route,
+                action: 'submitCatch',
+              });
+              setShowLogFullAreaModal(true);
+              return; // Don't close modal yet, wait for user confirmation
+            } else {
+              // Parent already encountered, just add the derived route
+              await addRouteProgressMutation.mutateAsync({ route: selectedRoute, includeParent: false });
+              handleCloseCatchModal();
+            }
+          } else {
+            // Regular route, add normally
+            await addRouteProgressMutation.mutateAsync({ route: selectedRoute, includeParent: false });
+            handleCloseCatchModal();
+          }
         } catch (routeErr: any) {
           // If marking as seen fails, log but don't block the Pokemon addition
           console.warn('Failed to mark route as seen:', routeErr);
+          handleCloseCatchModal();
         }
+      } else {
+        // Route already encountered or no route to add, just close modal
+        handleCloseCatchModal();
       }
-      
-      handleCloseCatchModal();
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to add Pokemon');
     }
-  }, [selectedRoute, selectedPokemonName, nickname, nature, ability, level, gender, status, pokemonInfo, routeEncounters, encounteredRoutes, addPokemonFromRouteMutation, addRouteProgressMutation, handleCloseCatchModal]);
+  }, [selectedRoute, selectedPokemonName, nickname, nature, ability, level, gender, status, pokemonInfo, routeEncounters, encounteredRoutes, addPokemonFromRouteMutation, addRouteProgressMutation, handleCloseCatchModal, gameFileId]);
 
   // Parse encounters for the modal - memoized
   const encounters = useMemo(() => {
@@ -1104,9 +1247,10 @@ export const RoutesPage = () => {
                     routeName={routeName}
                     isEncountered={true}
                     onMarkAsSeen={() => handleMarkAsSeen(routeName)}
-                    onLogEncounter={() => handleOpenCatchModal(routeName)}
-                    onLogEncounterWithPokemon={(pokemonName) => handleOpenCatchModal(routeName, pokemonName)}
+                    onLogEncounter={(actualRouteName) => handleOpenCatchModal(actualRouteName || routeName)}
+                    onLogEncounterWithPokemon={(pokemonName, actualRouteName) => handleOpenCatchModal(actualRouteName || routeName, pokemonName)}
                     gameName={gameName}
+                    gameFileId={gameFileId}
                     caughtPokemon={routeCaughtPokemon[routeName]}
                     ownedPokemonNames={ownedPokemonNames}
                     pokemonCaughtOn={pokemonCaughtOn}
@@ -1183,11 +1327,13 @@ export const RoutesPage = () => {
                     routeName={routeName}
                     isEncountered={false}
                     onMarkAsSeen={() => handleMarkAsSeen(routeName)}
-                    onLogEncounter={() => handleOpenCatchModal(routeName)}
-                    onLogEncounterWithPokemon={(pokemonName) => handleOpenCatchModal(routeName, pokemonName)}
+                    onLogEncounter={(actualRouteName) => handleOpenCatchModal(actualRouteName || routeName)}
+                    onLogEncounterWithPokemon={(pokemonName, actualRouteName) => handleOpenCatchModal(actualRouteName || routeName, pokemonName)}
                     gameName={gameName}
+                    gameFileId={gameFileId}
                     ownedPokemonNames={ownedPokemonNames}
                     pokemonCaughtOn={pokemonCaughtOn}
+                    encounteredRoutes={encounteredRoutes}
                   />
                 ))}
                 {displayedUpcomingCount < upcomingRoutes.length && (
@@ -1526,6 +1672,126 @@ export const RoutesPage = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Log Full Area Confirmation Modal */}
+      {showLogFullAreaModal && pendingRouteAction && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 60,
+          }}
+          onClick={() => {
+            setShowLogFullAreaModal(false);
+            setPendingRouteAction(null);
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              padding: '24px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              style={{
+                marginTop: 0,
+                marginBottom: '16px',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              Log Full Area?
+            </h2>
+            <p
+              style={{
+                color: 'var(--color-text-secondary)',
+                marginBottom: '20px',
+                lineHeight: '1.6',
+              }}
+            >
+              This is a derived route. Do you want to log the full area ({pendingRouteAction.parentRoute})?
+            </p>
+            <p
+              style={{
+                color: 'var(--color-text-secondary)',
+                marginBottom: '20px',
+                fontSize: '0.9rem',
+                lineHeight: '1.6',
+              }}
+            >
+              <strong>Log Full Area:</strong> Both the derived route ({pendingRouteAction.route}) and the parent route ({pendingRouteAction.parentRoute}) will be added to your encountered routes.
+              <br /><br />
+              <strong>Log Derived Route Only:</strong> Only the derived route ({pendingRouteAction.route}) will be added.
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+                marginTop: '24px',
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={async () => {
+                  setShowLogFullAreaModal(false);
+                  const action = pendingRouteAction;
+                  setPendingRouteAction(null);
+                  
+                  try {
+                    if (action.action === 'markAsSeen') {
+                      await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: false });
+                    } else if (action.action === 'submitCatch') {
+                      // Continue with Pokemon submission but only log derived route
+                      await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: false });
+                      // The Pokemon was already added, just need to close the catch modal
+                      handleCloseCatchModal();
+                    }
+                  } catch (err: any) {
+                    setError(err?.response?.data?.detail || 'Failed to update route progress');
+                  }
+                }}
+                style={{ fontSize: '0.9rem', padding: '10px 20px' }}
+              >
+                Log Derived Route Only
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  setShowLogFullAreaModal(false);
+                  const action = pendingRouteAction;
+                  setPendingRouteAction(null);
+                  
+                  try {
+                    if (action.action === 'markAsSeen') {
+                      await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: true });
+                    } else if (action.action === 'submitCatch') {
+                      // Continue with Pokemon submission and log full area
+                      await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: true });
+                      // The Pokemon was already added, just need to close the catch modal
+                      handleCloseCatchModal();
+                    }
+                  } catch (err: any) {
+                    setError(err?.response?.data?.detail || 'Failed to update route progress');
+                  }
+                }}
+                style={{ fontSize: '0.9rem', padding: '10px 20px' }}
+              >
+                Log Full Area
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -9,6 +9,8 @@ import {
   getRouteEncounters,
   addRouteProgress,
   addPokemonFromRoute,
+  getDerivedRoutes,
+  getParentRoute,
 } from '../services/routeService';
 import { queryKeys } from './queryKeys';
 import type { PokemonCreate } from '../services/pokemonService';
@@ -66,13 +68,22 @@ export const useAddRouteProgress = (gameFileId: number | null) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (route: string) => addRouteProgress(gameFileId!, route),
+    mutationFn: ({ route, includeParent }: { route: string; includeParent?: boolean }) => 
+      addRouteProgress(gameFileId!, route, includeParent || false),
     onSuccess: () => {
       if (gameFileId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.routeProgress(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.upcomingRoutes(gameFileId) });
       }
     },
+  });
+};
+
+export const useParentRoute = (gameFileId: number | null, routeName: string | null) => {
+  return useQuery({
+    queryKey: gameFileId && routeName ? ['parentRoute', gameFileId, routeName] : ['parentRoute', 'disabled'],
+    queryFn: () => getParentRoute(gameFileId!, routeName!),
+    enabled: !!gameFileId && !!routeName,
   });
 };
 
@@ -91,6 +102,14 @@ export const useAddPokemonFromRoute = (gameFileId: number | null) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.upcomingRoutes(gameFileId) });
       }
     },
+  });
+};
+
+export const useDerivedRoutes = (gameFileId: number | null, routeName: string | null) => {
+  return useQuery({
+    queryKey: gameFileId && routeName ? ['derivedRoutes', gameFileId, routeName] : ['derivedRoutes', 'disabled'],
+    queryFn: () => getDerivedRoutes(gameFileId!, routeName!),
+    enabled: !!gameFileId && !!routeName,
   });
 };
 

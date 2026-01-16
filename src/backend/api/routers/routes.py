@@ -4,6 +4,7 @@ Handles route progression and encounter data.
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from ..utils import verify_game_file
 from ...db import models
 from ..dependencies import get_db, get_current_user
@@ -91,34 +92,150 @@ async def get_upcoming_routes(game_file_id: int, user: models.User = Depends(get
     
     return {"upcoming_routes": upcoming_routes}
 
-# confirm route has been 'complete'
-@router.post("/game-files/{game_file_id}/route-progressed/{route}", status_code=201)
-async def add_route(game_file_id: int, route: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Add a route to route_progress only if it's in upcoming_routes."""
+@router.get("/game-files/{game_file_id}/derived-routes/{route_name}", status_code=200)
+async def get_derived_routes(game_file_id: int, route_name: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get all routes that are derived from a given route name (which is in locations_ordered)."""
     
     game_file = verify_game_file(game_file_id, user, db)
-
-    # 1. get upcoming routes
-    upcoming_routes = get_upcoming_routes_list(game_file, db)
-
-    # 2. evaluate whether route is in upcoming_routes
-    if route not in upcoming_routes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Route '{route}' is not in upcoming routes. Cannot add duplicate or invalid route."
-        )
     
+    version = db.query(models.Version).filter(models.Version.version_name == game_file.game_name).first()
+    
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found!")
+    
+    # Find all routes where derives_from matches the route_name (case-insensitive) and version_id matches
+    derived_routes = (
+        db.query(models.Route)
+        .filter(
+            func.lower(models.Route.derives_from) == route_name.lower(),
+            models.Route.version_id == version.version_id
+        )
+        .all()
+    )
+    
+    # Return just the route names
+    route_names = [route.name for route in derived_routes]
+    
+    return {"derived_routes": route_names}
+
+@router.get("/game-files/{game_file_id}/parent-route/{route_name}", status_code=200)
+async def get_parent_route(game_file_id: int, route_name: str, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get the parent route (from locations_ordered) for a derived route."""
+    
+    game_file = verify_game_file(game_file_id, user, db)
+    
+    version = db.query(models.Version).filter(models.Version.version_name == game_file.game_name).first()
+    
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found!")
+    
+    # Find the route by name (case-insensitive)
+    route = (
+        db.query(models.Route)
+        .filter(
+            func.lower(models.Route.name) == route_name.lower(),
+            models.Route.version_id == version.version_id
+        )
+        .first()
+    )
+    
+    if route is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found!")
+    
+    # If the route has a derives_from value, return it as the parent route
+    derives_from_value = getattr(route, 'derives_from', None)
+    if derives_from_value is not None and derives_from_value != "":
+        # Check if the parent route is in locations_ordered
+        locations_ordered_value = getattr(version, 'locations_ordered', None)
+        locations_ordered = list(locations_ordered_value) if locations_ordered_value else []
+        
+        # Find the parent route in locations_ordered (case-insensitive)
+        parent_route = next(
+            (loc for loc in locations_ordered if loc.lower() == route.derives_from.lower()),
+            None
+        )
+        
+        if parent_route:
+            return {"parent_route": parent_route, "is_derived": True}
+    
+    # If no route found or no derives_from, it's not a derived route
+    return {"parent_route": None, "is_derived": False}
+
+# confirm route has been 'complete'
+@router.post("/game-files/{game_file_id}/route-progressed/{route}", status_code=201)
+async def add_route(game_file_id: int, route: str, include_parent: bool = False, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Add a route to route_progress. If the route is a derived route and include_parent is True, also add the parent route."""
+    
+    game_file = verify_game_file(game_file_id, user, db)
+    version = db.query(models.Version).filter(models.Version.version_name == game_file.game_name).first()
+    
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found!")
+
     # Get current route_progress
     route_progress_value = getattr(game_file, 'route_progress', None)
     route_progress = list(route_progress_value) if route_progress_value is not None else []
     
-    # Add route (it's already validated to be in upcoming_routes, so it won't be a duplicate)
-    route_progress.append(route)
+    routes_to_add = []
+    parent_route = None
+    
+    # Check if this is a derived route
+    route_obj = (
+        db.query(models.Route)
+        .filter(
+            func.lower(models.Route.name) == route.lower(),
+            models.Route.version_id == version.version_id
+        )
+        .first()
+    )
+    
+    derives_from_value = None
+    if route_obj is not None:
+        derives_from_value = getattr(route_obj, 'derives_from', None)
+    
+    if route_obj is not None and derives_from_value is not None and derives_from_value != "":
+        # This is a derived route
+        locations_ordered_value = getattr(version, 'locations_ordered', None)
+        locations_ordered = list(locations_ordered_value) if locations_ordered_value else []
+        
+        # Find the parent route in locations_ordered (case-insensitive)
+        parent_route = next(
+            (loc for loc in locations_ordered if loc.lower() == derives_from_value.lower()),
+            None
+        )
+        
+        if include_parent and parent_route and parent_route not in route_progress:
+            # Add parent route first
+            routes_to_add.append(parent_route)
+        
+        # Add the derived route (it's validated to exist)
+        if route not in route_progress:
+            routes_to_add.append(route)
+    else:
+        # For regular routes, validate it's in upcoming_routes
+        upcoming_routes = get_upcoming_routes_list(game_file, db)
+        if route not in upcoming_routes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Route '{route}' is not in upcoming routes. Cannot add duplicate or invalid route."
+            )
+        if route not in route_progress:
+            routes_to_add.append(route)
+    
+    # Add all routes (avoiding duplicates)
+    for route_to_add in routes_to_add:
+        if route_to_add not in route_progress:
+            route_progress.append(route_to_add)
+    
     setattr(game_file, 'route_progress', route_progress)
     db.commit()
     db.refresh(game_file)
     
-    return {"message": f"Route '{route}' added to progress", "route_progress": route_progress}
+    message = f"Route '{route}' added to progress"
+    if include_parent and parent_route:
+        message += f", and parent route '{parent_route}' added to progress"
+    
+    return {"message": message, "route_progress": route_progress}
 
 
 

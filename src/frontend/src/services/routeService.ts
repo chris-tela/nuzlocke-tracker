@@ -23,6 +23,15 @@ export interface UpcomingRoutesResponse {
   upcoming_routes: string[];
 }
 
+export interface DerivedRoutesResponse {
+  derived_routes: string[];
+}
+
+export interface ParentRouteResponse {
+  parent_route: string | null;
+  is_derived: boolean;
+}
+
 export interface AddRouteResponse {
   message: string;
   route_progress: string[];
@@ -74,11 +83,11 @@ export const getUpcomingRoutes = async (gameFileId: number): Promise<string[]> =
  */
 export const addRouteProgress = async (
   gameFileId: number,
-  route: string
+  route: string,
+  includeParent: boolean = false
 ): Promise<AddRouteResponse> => {
-  return await apiHelpers.post<AddRouteResponse>(
-    `/api/routes/game-files/${gameFileId}/route-progressed/${route}`
-  );
+  const url = `/api/routes/game-files/${gameFileId}/route-progressed/${route}${includeParent ? '?include_parent=true' : ''}`;
+  return await apiHelpers.post<AddRouteResponse>(url);
 };
 
 /**
@@ -92,6 +101,31 @@ export const addPokemonFromRoute = async (
   return await apiHelpers.post<Pokemon>(
     `/api/routes/game-files/${gameFileId}/route-pokemon/${routeName}`,
     pokemon
+  );
+};
+
+/**
+ * Get routes that are derived from a given route name
+ */
+export const getDerivedRoutes = async (
+  gameFileId: number,
+  routeName: string
+): Promise<string[]> => {
+  const response = await apiHelpers.get<DerivedRoutesResponse>(
+    `/api/routes/game-files/${gameFileId}/derived-routes/${routeName}`
+  );
+  return response.derived_routes;
+};
+
+/**
+ * Get the parent route for a derived route
+ */
+export const getParentRoute = async (
+  gameFileId: number,
+  routeName: string
+): Promise<ParentRouteResponse> => {
+  return await apiHelpers.get<ParentRouteResponse>(
+    `/api/routes/game-files/${gameFileId}/parent-route/${routeName}`
   );
 };
 
