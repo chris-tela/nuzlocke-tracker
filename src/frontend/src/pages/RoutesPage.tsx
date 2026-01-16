@@ -8,6 +8,7 @@ import { useGameFile } from '../hooks/useGameFile';
 import { useUpcomingRoutes, useRouteProgress, useRouteEncounters, useAddRouteProgress, useAddPokemonFromRoute, useDerivedRoutes, useParentRoute } from '../hooks/useRoutes';
 import { getParentRoute } from '../services/routeService';
 import { usePokemonInfoByName, usePokemon } from '../hooks/usePokemon';
+import type { PokemonCreate } from '../services/pokemonService';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
@@ -802,6 +803,11 @@ export const RoutesPage = () => {
     route: string;
     parentRoute: string;
     action: 'markAsSeen' | 'submitCatch';
+    pokemonData?: {
+      pokemon: PokemonCreate;
+      routeName: string;
+      pokemonName: string;
+    };
   } | null>(null);
 
   const level = parseInt(levelInput, 10) || 0;
@@ -1010,27 +1016,17 @@ export const RoutesPage = () => {
 
     try {
       setError(null);
-      // Add the Pokemon
-      await addPokemonFromRouteMutation.mutateAsync({
-        routeName: selectedRoute,
-        pokemon: {
-          poke_id: pokemonInfo.poke_id,
-          nickname: nickname.trim() || null,
-          nature: nature || null,
-          ability: ability.trim() || null,
-          level: level,
-          gender: gender || null,
-          status: status || Status.PARTY,
-        },
-      });
       
-      // Track which Pokemon was caught from this route
-      if (selectedRoute) {
-        setRouteCaughtPokemon(prev => ({
-          ...prev,
-          [selectedRoute]: selectedPokemonName,
-        }));
-      }
+      // Prepare Pokemon data
+      const pokemonData = {
+        poke_id: pokemonInfo.poke_id,
+        nickname: nickname.trim() || null,
+        nature: nature || null,
+        ability: ability.trim() || null,
+        level: level,
+        gender: gender || null,
+        status: status || Status.PARTY,
+      };
 
       // Check if this is a derived route and handle parent route logging
       if (selectedRoute && !encounteredRoutes.includes(selectedRoute) && gameFileId) {
@@ -1042,31 +1038,88 @@ export const RoutesPage = () => {
             const isParentEncountered = encounteredRoutes.includes(parentRouteInfo.parent_route);
             
             if (!isParentEncountered) {
-              // Show confirmation modal instead of browser popup
+              // Show confirmation modal - store Pokemon data to add after confirmation
               setPendingRouteAction({
                 route: selectedRoute,
                 parentRoute: parentRouteInfo.parent_route,
                 action: 'submitCatch',
+                pokemonData: {
+                  pokemon: pokemonData,
+                  routeName: selectedRoute,
+                  pokemonName: selectedPokemonName,
+                },
               });
               setShowLogFullAreaModal(true);
-              return; // Don't close modal yet, wait for user confirmation
+              return; // Don't add Pokemon or close modal yet, wait for user confirmation
             } else {
-              // Parent already encountered, just add the derived route
+              // Parent already encountered, add Pokemon and route, then close modal
+              await addPokemonFromRouteMutation.mutateAsync({
+                routeName: selectedRoute,
+                pokemon: pokemonData,
+              });
+              
+              // Track which Pokemon was caught from this route
+              if (selectedRoute) {
+                setRouteCaughtPokemon(prev => ({
+                  ...prev,
+                  [selectedRoute]: selectedPokemonName,
+                }));
+              }
+              
               await addRouteProgressMutation.mutateAsync({ route: selectedRoute, includeParent: false });
               handleCloseCatchModal();
             }
           } else {
-            // Regular route, add normally
+            // Regular route, add Pokemon and route, then close modal
+            await addPokemonFromRouteMutation.mutateAsync({
+              routeName: selectedRoute,
+              pokemon: pokemonData,
+            });
+            
+            // Track which Pokemon was caught from this route
+            if (selectedRoute) {
+              setRouteCaughtPokemon(prev => ({
+                ...prev,
+                [selectedRoute]: selectedPokemonName,
+              }));
+            }
+            
             await addRouteProgressMutation.mutateAsync({ route: selectedRoute, includeParent: false });
             handleCloseCatchModal();
           }
         } catch (routeErr: any) {
-          // If marking as seen fails, log but don't block the Pokemon addition
-          console.warn('Failed to mark route as seen:', routeErr);
+          // If route check fails, still add the Pokemon
+          await addPokemonFromRouteMutation.mutateAsync({
+            routeName: selectedRoute,
+            pokemon: pokemonData,
+          });
+          
+          // Track which Pokemon was caught from this route
+          if (selectedRoute) {
+            setRouteCaughtPokemon(prev => ({
+              ...prev,
+              [selectedRoute]: selectedPokemonName,
+            }));
+          }
+          
+          console.warn('Failed to check route:', routeErr);
           handleCloseCatchModal();
         }
       } else {
-        // Route already encountered or no route to add, just close modal
+        // Route already encountered or no route to add, just add Pokemon and close modal
+        await addPokemonFromRouteMutation.mutateAsync({
+          routeName: selectedRoute,
+          pokemon: pokemonData,
+        });
+        
+        // Track which Pokemon was caught from this route
+        if (selectedRoute) {
+          setRouteCaughtPokemon(prev => ({
+            ...prev,
+            [selectedRoute]: selectedPokemonName,
+          }));
+        }
+        
         handleCloseCatchModal();
       }
     } catch (err: any) {
@@ -1688,9 +1741,15 @@ export const RoutesPage = () => {
             justifyContent: 'center',
             zIndex: 60,
           }}
-          onClick={() => {
+          onClick={async () => {
+            // User clicked outside - cancel the action
+            // If it was a Pokemon catch, don't add it
             setShowLogFullAreaModal(false);
             setPendingRouteAction(null);
+            // Close the catch modal if it was open
+            if (showCatchModal) {
+              handleCloseCatchModal();
+            }
           }}
         >
           <div
@@ -1709,7 +1768,7 @@ export const RoutesPage = () => {
                 color: 'var(--color-text-primary)',
               }}
             >
-              Log Full Area?
+              Pinwheel Clause
             </h2>
             <p
               style={{
@@ -1752,14 +1811,27 @@ export const RoutesPage = () => {
                   try {
                     if (action.action === 'markAsSeen') {
                       await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: false });
-                    } else if (action.action === 'submitCatch') {
-                      // Continue with Pokemon submission but only log derived route
+                    } else if (action.action === 'submitCatch' && action.pokemonData) {
+                      // Add the Pokemon first
+                      await addPokemonFromRouteMutation.mutateAsync({
+                        routeName: action.pokemonData.routeName,
+                        pokemon: action.pokemonData.pokemon,
+                      });
+                      
+                      // Track which Pokemon was caught from this route
+                      if (action.pokemonData.routeName) {
+                        setRouteCaughtPokemon(prev => ({
+                          ...prev,
+                          [action.pokemonData!.routeName]: action.pokemonData!.pokemonName,
+                        }));
+                      }
+                      
+                      // Then log only the derived route
                       await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: false });
-                      // The Pokemon was already added, just need to close the catch modal
                       handleCloseCatchModal();
                     }
                   } catch (err: any) {
-                    setError(err?.response?.data?.detail || 'Failed to update route progress');
+                    setError(err?.response?.data?.detail || 'Failed to add Pokemon or update route progress');
                   }
                 }}
                 style={{ fontSize: '0.9rem', padding: '10px 20px' }}
@@ -1777,14 +1849,27 @@ export const RoutesPage = () => {
                   try {
                     if (action.action === 'markAsSeen') {
                       await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: true });
-                    } else if (action.action === 'submitCatch') {
-                      // Continue with Pokemon submission and log full area
+                    } else if (action.action === 'submitCatch' && action.pokemonData) {
+                      // Add the Pokemon first
+                      await addPokemonFromRouteMutation.mutateAsync({
+                        routeName: action.pokemonData.routeName,
+                        pokemon: action.pokemonData.pokemon,
+                      });
+                      
+                      // Track which Pokemon was caught from this route
+                      if (action.pokemonData.routeName) {
+                        setRouteCaughtPokemon(prev => ({
+                          ...prev,
+                          [action.pokemonData!.routeName]: action.pokemonData!.pokemonName,
+                        }));
+                      }
+                      
+                      // Then log full area (both routes)
                       await addRouteProgressMutation.mutateAsync({ route: action.route, includeParent: true });
-                      // The Pokemon was already added, just need to close the catch modal
                       handleCloseCatchModal();
                     }
                   } catch (err: any) {
-                    setError(err?.response?.data?.detail || 'Failed to update route progress');
+                    setError(err?.response?.data?.detail || 'Failed to add Pokemon or update route progress');
                   }
                 }}
                 style={{ fontSize: '0.9rem', padding: '10px 20px' }}
