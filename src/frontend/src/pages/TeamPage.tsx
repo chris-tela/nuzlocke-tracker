@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
-import { usePartyPokemon, useStoredPokemon, useFaintedPokemon, useUpdatePokemon, useEvolvePokemon, useSwapPokemon, usePokemonInfo, usePokemonInfoByName } from '../hooks/usePokemon';
+import { usePartyPokemon, useStoredPokemon, useFaintedPokemon, useUpdatePokemon, useEvolvePokemon, useSwapPokemon, useRemovePokemon, usePokemonInfo, usePokemonInfoByName } from '../hooks/usePokemon';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import type { Pokemon } from '../types/pokemon';
@@ -18,6 +18,7 @@ export const TeamPage = () => {
   const updatePokemonMutation = useUpdatePokemon(gameFileId);
   const evolvePokemonMutation = useEvolvePokemon(gameFileId);
   const swapPokemonMutation = useSwapPokemon(gameFileId);
+  const removePokemonMutation = useRemovePokemon(gameFileId);
 
   const isLoading = isLoadingParty || isLoadingStored || isLoadingFainted;
 
@@ -25,6 +26,7 @@ export const TeamPage = () => {
   const [evolvingPokemon, setEvolvingPokemon] = useState<Pokemon | null>(null);
   const [selectedEvolution, setSelectedEvolution] = useState<string | null>(null);
   const [faintingPokemon, setFaintingPokemon] = useState<Pokemon | null>(null);
+  const [deletingPokemon, setDeletingPokemon] = useState<Pokemon | null>(null);
   const [swappingPokemon, setSwappingPokemon] = useState<Pokemon | null>(null);
   const [selectedPartyPokemonForSwap, setSelectedPartyPokemonForSwap] = useState<number | null>(null);
   const [nickname, setNickname] = useState('');
@@ -216,6 +218,28 @@ export const TeamPage = () => {
     }
   };
 
+  const openDeleteConfirmation = (pokemon: Pokemon) => {
+    setDeletingPokemon(pokemon);
+    setError(null);
+  };
+
+  const closeDeleteConfirmation = () => {
+    setDeletingPokemon(null);
+    setError(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingPokemon) return;
+
+    try {
+      setError(null);
+      await removePokemonMutation.mutateAsync(deletingPokemon.id);
+      closeDeleteConfirmation();
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Failed to delete Pokemon');
+    }
+  };
+
   // Helper function to get all evolution options with their requirements
   const getEvolutionOptions = (pokemon: Pokemon) => {
     const evoData = pokemon.evolution_data || [];
@@ -369,8 +393,44 @@ export const TeamPage = () => {
                   border: '1px solid var(--color-border)',
                   borderRadius: '12px',
                   backgroundColor: 'var(--color-bg-card)',
+                  position: 'relative',
                 }}
               >
+                <button
+                  type="button"
+                  onClick={() => openDeleteConfirmation(pokemon)}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    border: '1px solid #dc2626',
+                    backgroundColor: 'transparent',
+                    color: '#dc2626',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    lineHeight: 1,
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dc2626';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#dc2626';
+                  }}
+                  title="Delete Pokemon"
+                >
+                  −
+                </button>
                 <div
                   style={{
                     display: 'flex',
@@ -527,8 +587,44 @@ export const TeamPage = () => {
                   border: '1px solid var(--color-border)',
                   borderRadius: '12px',
                   backgroundColor: 'var(--color-bg-card)',
+                  position: 'relative',
                 }}
               >
+                <button
+                  type="button"
+                  onClick={() => openDeleteConfirmation(pokemon)}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    border: '1px solid #dc2626',
+                    backgroundColor: 'transparent',
+                    color: '#dc2626',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    lineHeight: 1,
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dc2626';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#dc2626';
+                  }}
+                  title="Delete Pokemon"
+                >
+                  −
+                </button>
                 <div
                   style={{
                     display: 'flex',
@@ -692,8 +788,44 @@ export const TeamPage = () => {
                   borderRadius: '12px',
                   backgroundColor: 'var(--color-bg-card)',
                   opacity: 0.7,
+                  position: 'relative',
                 }}
               >
+                <button
+                  type="button"
+                  onClick={() => openDeleteConfirmation(pokemon)}
+                  style={{
+                    position: 'absolute',
+                    top: '8px',
+                    right: '8px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    border: '1px solid #dc2626',
+                    backgroundColor: 'transparent',
+                    color: '#dc2626',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    lineHeight: 1,
+                    transition: 'all 150ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dc2626';
+                    e.currentTarget.style.color = 'white';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = '#dc2626';
+                  }}
+                  title="Delete Pokemon"
+                >
+                  −
+                </button>
                 <div
                   style={{
                     display: 'flex',
@@ -1425,6 +1557,92 @@ export const TeamPage = () => {
                 style={{ fontSize: '0.85rem', padding: '8px 14px' }}
               >
                 Mark Fainted
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingPokemon && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              width: '100%',
+              maxWidth: '420px',
+              padding: '24px',
+            }}
+          >
+            <h2
+              style={{
+                marginTop: 0,
+                marginBottom: '12px',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              Delete {deletingPokemon.nickname || deletingPokemon.name}?
+            </h2>
+
+            <p
+              style={{
+                marginBottom: '16px',
+                fontSize: '0.9rem',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              Are you sure? This will permanently delete this Pokemon from your team. This action cannot be undone.
+            </p>
+
+            {error && (
+              <div
+                style={{
+                  marginBottom: '12px',
+                  padding: '10px',
+                  backgroundColor: '#FEE2E2',
+                  border: '1px solid #F87171',
+                  borderRadius: '8px',
+                  color: '#B91C1C',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {error}
+              </div>
+            )}
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '8px',
+                marginTop: '8px',
+              }}
+            >
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={closeDeleteConfirmation}
+                style={{ fontSize: '0.85rem', padding: '8px 14px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleConfirmDelete}
+                style={{ fontSize: '0.85rem', padding: '8px 14px' }}
+              >
+                Delete
               </button>
             </div>
           </div>

@@ -117,6 +117,18 @@ export const swapPokemon = async (
 };
 
 /**
+ * Delete a pokemon entirely from the game file
+ */
+export const removePokemon = async (
+  gameFileId: number,
+  pokemonId: number
+): Promise<{ message: string }> => {
+  return await apiHelpers.delete<{ message: string }>(
+    `/api/pokemon/game-files/${gameFileId}/pokemon/${pokemonId}`
+  );
+};
+
+/**
  * Get base pokemon information by poke_id
  */
 export const getPokemonInfo = async (pokeId: number): Promise<BasePokemon> => {

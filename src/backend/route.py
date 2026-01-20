@@ -82,19 +82,24 @@ def get_encounters(route: str, region_name: str, version_name: str, derived_from
                     encounter_data.append([{"name": name}, {"min_level": min_level}, {"max_level": max_level}, {"game_name": version_name}, {"region_name": region_name}, encounter_details])
     if encounter_data == []:
         raise Exception("Location contains no encounters")
-    
+
+
     # Add route if we successfully got data
     # Create a session if one wasn't provided
     session_provided = db is not None
     if db is None:
         db = database.SessionLocal()
+    version = db.query(models.Version).filter(models.Version.version_name == version_name).first()
+    if version is not None:
+        version_id = version.version_id
+        region_id = version.generation_id
     
     try:
         print(f"Adding route: {route}")
         route_encounter = models.Route(
             name = route,
-            version_id = 1,
-            region_id = 1,
+            version_id = version_id,
+            region_id = region_id,
             derives_from = derived_from,
             data = encounter_data
         )

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..utils import verify_game_file
 from ...db import models
 from ..dependencies import get_db, get_current_user
-from ..schemas import PokemonResponse, PokemonCreate, PokemonUpdate
+from ..schemas import PokemonBase, PokemonResponse, PokemonCreate, PokemonUpdate
 
 router = APIRouter()
 
@@ -84,6 +84,32 @@ async def create_pokemon(game_file_id: int, pokemon: PokemonCreate,
     return add_pokemon(game_file_id, pokemon, db)
 
 
+@router.delete("/game-files/{game_file_id}/pokemon/{pokemon_id}")
+async def delete_pokemon(
+    game_file_id: int,
+    pokemon_id: int,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a pokemon entirely from the game file."""
+    verify_game_file(game_file_id, user, db)
+    
+    pokemon = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.id == pokemon_id,
+        models.OwnedPokemon.game_file_id == game_file_id
+    ).first()
+    
+    if pokemon is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pokemon not found in team!"
+        )
+    
+    db.delete(pokemon)
+    db.commit()
+    
+    return {"message": "Successfully deleted!"}
+
 
 def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
     pokemon_data = db.query(models.AllPokemon).filter(models.AllPokemon.poke_id == pokemon.poke_id).first()
@@ -122,6 +148,10 @@ def add_pokemon(game_file_id: int, pokemon: PokemonCreate, db: Session):
     db.refresh(pokemon_to_db)
     
     return PokemonResponse.model_validate(pokemon_to_db)
+
+
+    
+
 
 def perform_swap(partied_pokemon: models.OwnedPokemon, swap_pokemon: models.OwnedPokemon, db: Session):
     """Helper function to swap two pokemon between party and storage."""

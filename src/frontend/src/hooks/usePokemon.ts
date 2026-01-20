@@ -14,6 +14,7 @@ import {
   updatePokemon,
   evolvePokemon,
   swapPokemon,
+  removePokemon,
   getStarters,
 } from '../services/pokemonService';
 import { queryKeys } from './queryKeys';
@@ -142,6 +143,22 @@ export const useSwapPokemon = (gameFileId: number | null) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.storedPokemon(gameFileId) });
+      }
+    },
+  });
+};
+
+export const useRemovePokemon = (gameFileId: number | null) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (pokemonId: number) => removePokemon(gameFileId!, pokemonId),
+    onSuccess: () => {
+      if (gameFileId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.storedPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.faintedPokemon(gameFileId) });
       }
     },
   });
