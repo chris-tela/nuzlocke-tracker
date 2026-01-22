@@ -94,6 +94,9 @@ def get_encounters(route: str, region_name: str, version_name: str, derived_from
         version_id = version.version_id
         region_id = version.generation_id
     
+
+    if route.__contains__("sea-route"):
+        route = route.replace("sea-", "")
     try:
         print(f"Adding route: {route}")
         route_encounter = models.Route(
@@ -129,7 +132,6 @@ def get_location(loc: str, region: str,  version: str):
         raise Exception("Location contains one or none areas, and does not need to be condensed")
     
 
-    print("test3")
     areas_encounters = []
     for area in areas:
         try:
@@ -198,3 +200,13 @@ def merge_encounters(list1, list2):
 
     return list(merged.values())
 
+
+
+
+if __name__ == "__main__":
+    # Create a database session for script execution
+    db_session = database.SessionLocal()
+    try:
+        get_encounters("johto-sea-route-41", "johto", "heartgold", "", db_session)
+    finally:
+        db_session.close()

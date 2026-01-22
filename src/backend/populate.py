@@ -22,7 +22,6 @@ async def root():
 # initalize all pokemon in the database
 @app.post("/populate/pokemon")
 async def populate_pokemon(db: Session = Depends(database.get_db)):
-    print("t")
     index = 1
     while True:
         response = requests.get(f"https://pokeapi.co/api/v2/pokemon/{index}")
@@ -54,7 +53,7 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
                     evolution_result = evolution_parse(chain, name)
                     evolution_data = evolution_result.get("evolution_data", [])  # Extract just the array
                 except Exception as evo_error:
-                    print(f"Evolution parsing error at {index}: {evo_error}")
+                    print(f"Evolution error at {index}: {evo_error}")
 
             except Exception as e:
                 print(f"Error at {index}: {e}")
