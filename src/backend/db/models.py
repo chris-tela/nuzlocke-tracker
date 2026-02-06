@@ -168,3 +168,13 @@ class Gym(Base):
     pokemon = Column(JSON, nullable=False)
 
 
+class Type(Base):
+    __tablename__ = "type"
+
+    id = Column(Integer, primary_key=True)
+    type_name = Column(String, nullable=False)
+    generation_introduction = Column(Integer, nullable=False)
+    current_damage_relations = Column(JSON, nullable=False)
+    past_damage_relations = Column(JSON, nullable=True) # from generation_introduction to past_generation ex. (steel: gen 2 - 5 past damage relations, 6 - onwards current relations)
+
+

@@ -487,6 +487,21 @@ def populate_gyms(db: Session = Depends(database.get_db)):
     return {"message": "Gyms populated successfully"}
 
 
+@app.post("/types")
+def populate_types(db: Session = Depends(database.get_db)):
+    url = requests.get((f"https://pokeapi.co/api/v2/type/")).json()
+
+    if url is None:
+        raise HTTPException(status_code=404, detail=f"Types url not found in PokeAPI!")
+    
+    try:
+        for pokemon_type in url["results"]:
+            name = pokemon_type["name"]
+            type_url = pokemon_type["url"]
+
+def populate_type(url):
+    url = requests.get(url).json()
+    
 
         
 
