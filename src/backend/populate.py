@@ -487,7 +487,7 @@ def populate_gyms(db: Session = Depends(database.get_db)):
     return {"message": "Gyms populated successfully"}
 
 
-@app.post("/types")
+@app.post("/populate/types")
 def populate_types(db: Session = Depends(database.get_db)):
     url = requests.get((f"https://pokeapi.co/api/v2/type/")).json()
 
@@ -495,17 +495,71 @@ def populate_types(db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=404, detail=f"Types url not found in PokeAPI!")
     
     try:
+        x = 1
         for pokemon_type in url["results"]:
             name = pokemon_type["name"]
             type_url = pokemon_type["url"]
 
+            populated = populate_type(type_url)
+            print(populated)
+            pokemon_type = models.Type(
+                id = x,
+                type_name = populated[0],
+                generation_introduction = populated[1],
+                current_damage_relations=populated[2],
+                past_damage_relations = populated[3]
+            )
+            db.add(pokemon_type)
+            x +=1
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing types: {e}")
+    db.commit()
+    db.close()
+
+    return {"message": "Types populated successfully!"}
+
 def populate_type(url):
     url = requests.get(url).json()
+
+    type_name = url["name"]
+    generation_introduction = url["generation"]["url"].split("/")[-2]
+
+    damage_relations = get_damage_relations(url["damage_relations"])
+    try:
+        all_past_damage_relations = []
+
+        past_damage_relations_list = url.get("past_damage_relations", [])
+
+        if past_damage_relations_list:  # make sure list is not empty
+            # get generation from first item (example)
+            first = past_damage_relations_list[0]
+            past_damage_generation = first.get("damage_relations", {}).get("generation", {}).get("url", "").split("/")[-2]
+
+            for past_relation in past_damage_relations_list:
+                past_damage = get_damage_relations(past_relation.get("damage_relations", {}))
+                past_damage["since"] = past_damage_generation  # fixed assignment
+                all_past_damage_relations.append(past_damage)
+        else:
+            all_past_damage_relations = []
+
+    except (KeyError, IndexError, TypeError):
+        all_past_damage_relations = []
+
+    
+    return (type_name, generation_introduction, damage_relations, all_past_damage_relations)
     
 
-        
+# {"double_damage_from": [x,x,x], ...}
+def get_damage_relations(relations_dict: dict):
+    # relations_dict is a dict like damage_relations
 
-
+    try:
+        for key, relation_list in relations_dict.items():  # loop over "double_damage_from", etc.
+            for relation in relation_list:                
+                relation.pop("url", None)     
+    except Exception:
+        pass        
+    return relations_dict
 
 
 
