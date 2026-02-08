@@ -4,3 +4,4 @@ myenv/
 *.txt
 *.json
 *.md
+.worktrees/
