@@ -90,3 +90,64 @@ def score_team_matchup(team1, team2, generation, types_data):
             "relations_used": relations_used
         }
     }
+
+
+def team_diversity_coverage(team, generation, types_data):
+    type_map = {}
+    for type_row in types_data:
+        type_name = _get_type_field(type_row, "type_name")
+        intro_gen = int(_get_type_field(type_row, "generation_introduction", 0))
+        if type_name and intro_gen <= int(generation):
+            type_map[str(type_name).lower()] = type_row
+
+    team_types = [t for t in _flatten_team_types(team) if t in type_map]
+    relations_by_type = {
+        type_name: _select_damage_relations(type_row, generation)
+        for type_name, type_row in type_map.items()
+    }
+
+    coverage = {}
+    for target_type in sorted(type_map.keys()):
+        offense = {
+            "double_to": 0,
+            "half_to": 0,
+            "no_to": 0,
+            "neutral_to": 0,
+        }
+        defense = {
+            "double_from": 0,
+            "half_from": 0,
+            "no_from": 0,
+            "neutral_from": 0,
+        }
+
+        for team_type in team_types:
+            relations = relations_by_type[team_type]
+            if target_type in relations["double_damage_to"]:
+                offense["double_to"] += 1
+            elif target_type in relations["half_damage_to"]:
+                offense["half_to"] += 1
+            elif target_type in relations["no_damage_to"]:
+                offense["no_to"] += 1
+            else:
+                offense["neutral_to"] += 1
+
+            if target_type in relations["double_damage_from"]:
+                defense["double_from"] += 1
+            elif target_type in relations["half_damage_from"]:
+                defense["half_from"] += 1
+            elif target_type in relations["no_damage_from"]:
+                defense["no_from"] += 1
+            else:
+                defense["neutral_from"] += 1
+
+        coverage[target_type] = {
+            "offense": offense,
+            "defense": defense,
+        }
+
+    return {
+        "generation": int(generation),
+        "team_types": team_types,
+        "coverage": coverage,
+    }
