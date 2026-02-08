@@ -5,3 +5,7 @@ myenv/
 *.json
 *.md
 .worktrees/
+
+
+data/
+
