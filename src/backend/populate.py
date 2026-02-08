@@ -528,16 +528,15 @@ def populate_type(url):
     try:
         all_past_damage_relations = []
 
-        past_damage_relations_list = url.get("past_damage_relations", [])
+        past_damage_relations_list = url["past_damage_relations"]
 
         if past_damage_relations_list:  # make sure list is not empty
-            # get generation from first item (example)
-            first = past_damage_relations_list[0]
-            past_damage_generation = first.get("damage_relations", {}).get("generation", {}).get("url", "").split("/")[-2]
+            
+            
 
             for past_relation in past_damage_relations_list:
-                past_damage = get_damage_relations(past_relation.get("damage_relations", {}))
-                past_damage["since"] = past_damage_generation  # fixed assignment
+                past_damage = get_damage_relations(past_relation["damage_relations"])
+                past_damage["on_and_backwards"] = past_relation["generation"]["url"].split("/")[-2]  # fixed assignment
                 all_past_damage_relations.append(past_damage)
         else:
             all_past_damage_relations = []
