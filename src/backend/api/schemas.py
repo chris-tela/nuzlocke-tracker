@@ -142,6 +142,25 @@ class GymProgressResponse(BaseModel):
     gym_progress: List[Dict[str, Any]]
     upcoming_gyms: List[Dict[str, Any]]
 
+# Team Synergy Schemas
+class TeamSynergyEntry(BaseModel):
+    type: str
+    multiplier: float
+    contributors: List[str]
+
+
+class TeamSynergySection(BaseModel):
+    strengths: List[TeamSynergyEntry]
+    weaknesses: List[TeamSynergyEntry]
+    immunities: List[TeamSynergyEntry]
+
+
+class TeamSynergySummary(BaseModel):
+    generation: int
+    team_types: List[str]
+    offense: TeamSynergySection
+    defense: TeamSynergySection
+
 # Authentication Schemas
 class UserRegister(BaseModel):
     username: str

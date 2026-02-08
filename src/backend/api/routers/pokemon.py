@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from ..utils import verify_game_file
 from ...db import models
 from ..dependencies import get_db, get_current_user
-from ..schemas import PokemonBase, PokemonResponse, PokemonCreate, PokemonUpdate
+from ..schemas import PokemonBase, PokemonResponse, PokemonCreate, PokemonUpdate, TeamSynergySummary
+from ...team_synergy import summarize_team_coverage
 
 router = APIRouter()
 
@@ -47,6 +48,47 @@ async def get_party_pokemon(game_file_id: int,
 
     # Return list of pokemon (empty list if no pokemon)
     return [PokemonResponse.model_validate(pokemon) for pokemon in owned_pokemon if pokemon.status is models.Status.PARTY]
+
+
+@router.get("/game-files/{game_file_id}/team-synergy", response_model=TeamSynergySummary)
+async def get_team_synergy(
+    game_file_id: int,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    game_file = verify_game_file(game_file_id, user, db)
+
+    version = db.query(models.Version).filter(
+        models.Version.version_name == game_file.game_name
+    ).first()
+
+    if version is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Version for game file not found."
+        )
+
+    party_pokemon = db.query(models.OwnedPokemon).filter(
+        models.OwnedPokemon.game_file_id == game_file.id,
+        models.OwnedPokemon.status == models.Status.PARTY
+    ).all()
+
+    team = [
+        {
+            "name": pokemon.nickname or pokemon.name,
+            "types": pokemon.types,
+        }
+        for pokemon in party_pokemon
+    ]
+    types_data = db.query(models.Type).all()
+
+    if not types_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Type data not available."
+        )
+
+    return summarize_team_coverage(team, version.generation_id, types_data)
 @router.get("/game-files/{game_file_id}/pokemon/storage")
 async def get_stored_pokemon(game_file_id: int,
     user: models.User = Depends(get_current_user),

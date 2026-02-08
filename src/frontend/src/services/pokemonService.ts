@@ -3,7 +3,7 @@
  * Handles pokemon CRUD operations, evolution, and status management.
  */
 import { apiHelpers } from './api';
-import type { Pokemon, BasePokemon } from '../types';
+import type { Pokemon, BasePokemon, TeamSynergySummary } from '../types';
 import type { StatusValue } from '../types/enums';
 
 export interface PokemonCreate {
@@ -61,6 +61,15 @@ export const getStoredPokemon = async (gameFileId: number): Promise<Pokemon[]> =
  */
 export const getFaintedPokemon = async (gameFileId: number): Promise<Pokemon[]> => {
   return await apiHelpers.get<Pokemon[]>(`/api/pokemon/game-files/${gameFileId}/pokemon/fainted`);
+};
+
+/**
+ * Get party team synergy summary
+ */
+export const getTeamSynergy = async (gameFileId: number): Promise<TeamSynergySummary> => {
+  return await apiHelpers.get<TeamSynergySummary>(
+    `/api/pokemon/game-files/${gameFileId}/team-synergy`
+  );
 };
 
 /**

@@ -15,6 +15,7 @@ import {
   evolvePokemon,
   swapPokemon,
   removePokemon,
+  getTeamSynergy,
   getStarters,
 } from '../services/pokemonService';
 import { queryKeys } from './queryKeys';
@@ -49,6 +50,14 @@ export const useFaintedPokemon = (gameFileId: number | null) => {
   return useQuery({
     queryKey: gameFileId ? queryKeys.faintedPokemon(gameFileId) : ['pokemon', 'fainted', 'disabled'],
     queryFn: () => getFaintedPokemon(gameFileId!),
+    enabled: !!gameFileId,
+  });
+};
+
+export const useTeamSynergy = (gameFileId: number | null) => {
+  return useQuery({
+    queryKey: gameFileId ? queryKeys.teamSynergy(gameFileId) : ['pokemon', 'team-synergy', 'disabled'],
+    queryFn: () => getTeamSynergy(gameFileId!),
     enabled: !!gameFileId,
   });
 };
@@ -96,6 +105,7 @@ export const useAddPokemon = (gameFileId: number | null) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.storedPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.teamSynergy(gameFileId) });
       }
     },
   });
@@ -112,6 +122,7 @@ export const useUpdatePokemon = (gameFileId: number | null) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.storedPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.teamSynergy(gameFileId) });
       }
     },
   });
@@ -127,6 +138,7 @@ export const useEvolvePokemon = (gameFileId: number | null) => {
       if (gameFileId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.teamSynergy(gameFileId) });
       }
     },
   });
@@ -143,6 +155,7 @@ export const useSwapPokemon = (gameFileId: number | null) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.pokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.storedPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.teamSynergy(gameFileId) });
       }
     },
   });
@@ -159,6 +172,7 @@ export const useRemovePokemon = (gameFileId: number | null) => {
         queryClient.invalidateQueries({ queryKey: queryKeys.partyPokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.storedPokemon(gameFileId) });
         queryClient.invalidateQueries({ queryKey: queryKeys.faintedPokemon(gameFileId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.teamSynergy(gameFileId) });
       }
     },
   });

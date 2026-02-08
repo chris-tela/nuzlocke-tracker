@@ -46,4 +46,23 @@ export interface BasePokemon {
   created_at: string;
 }
 
+export interface TeamSynergyEntry {
+  type: string;
+  multiplier: number;
+  contributors: string[];
+}
+
+export interface TeamSynergySection {
+  strengths: TeamSynergyEntry[];
+  weaknesses: TeamSynergyEntry[];
+  immunities: TeamSynergyEntry[];
+}
+
+export interface TeamSynergySummary {
+  generation: number;
+  team_types: string[];
+  offense: TeamSynergySection;
+  defense: TeamSynergySection;
+}
+
 

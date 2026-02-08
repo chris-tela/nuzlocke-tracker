@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
-import { usePartyPokemon, useStoredPokemon, useFaintedPokemon, useUpdatePokemon, useEvolvePokemon, useSwapPokemon, useRemovePokemon, usePokemonInfo, usePokemonInfoByName } from '../hooks/usePokemon';
+import { usePartyPokemon, useStoredPokemon, useFaintedPokemon, useUpdatePokemon, useEvolvePokemon, useSwapPokemon, useRemovePokemon, usePokemonInfo, usePokemonInfoByName, useTeamSynergy } from '../hooks/usePokemon';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
+import { TeamSynergySidebar } from '../components/TeamSynergySidebar';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import type { Pokemon } from '../types/pokemon';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
@@ -15,6 +16,7 @@ export const TeamPage = () => {
   const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFileId);
   const { data: storedPokemon = [], isLoading: isLoadingStored } = useStoredPokemon(gameFileId);
   const { data: faintedPokemon = [], isLoading: isLoadingFainted } = useFaintedPokemon(gameFileId);
+  const { data: teamSynergy, isLoading: isLoadingSynergy, isError: isErrorSynergy } = useTeamSynergy(gameFileId);
   const updatePokemonMutation = useUpdatePokemon(gameFileId);
   const evolvePokemonMutation = useEvolvePokemon(gameFileId);
   const swapPokemonMutation = useSwapPokemon(gameFileId);
@@ -359,7 +361,18 @@ export const TeamPage = () => {
         </button>
       </div>
 
-      <div style={{ width: '100%', maxWidth: '900px' }}>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '1300px',
+          display: 'flex',
+          gap: '24px',
+          alignItems: 'flex-start',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: '1 1 620px', minWidth: 0, maxWidth: '900px' }}>
+          <div style={{ width: '100%' }}>
         <h2
           style={{
             color: 'var(--color-text-primary)',
@@ -553,7 +566,7 @@ export const TeamPage = () => {
       </div>
 
       {/* Storage Section */}
-      <div style={{ width: '100%', maxWidth: '900px', marginTop: '32px' }}>
+      <div style={{ width: '100%', marginTop: '32px' }}>
         <h2
           style={{
             color: 'var(--color-text-primary)',
@@ -753,7 +766,7 @@ export const TeamPage = () => {
       </div>
 
       {/* Fainted Section */}
-      <div style={{ width: '100%', maxWidth: '900px', marginTop: '32px' }}>
+      <div style={{ width: '100%', marginTop: '32px' }}>
         <h2
           style={{
             color: 'var(--color-text-primary)',
@@ -912,6 +925,15 @@ export const TeamPage = () => {
             ))}
           </div>
         )}
+          </div>
+        </div>
+        <div style={{ flex: '0 0 360px', width: '360px' }}>
+          <TeamSynergySidebar
+            isLoading={isLoadingSynergy}
+            isError={isErrorSynergy}
+            synergy={teamSynergy}
+          />
+        </div>
       </div>
 
       {/* Edit Modal */}
@@ -1790,3 +1812,4 @@ const EvolutionOptionButton = ({
     </button>
   );
 };
+

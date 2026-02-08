@@ -15,6 +15,7 @@ export const queryKeys = {
   storedPokemon: (gameFileId: number) => ['pokemon', gameFileId, 'stored'] as const,
   faintedPokemon: (gameFileId: number) => ['pokemon', gameFileId, 'fainted'] as const,
   pokemonInfo: (pokeId: number) => ['pokemon', 'info', pokeId] as const,
+  teamSynergy: (gameFileId: number) => ['pokemon', gameFileId, 'team-synergy'] as const,
   
   // Route queries
   routes: (gameFileId: number) => ['routes', gameFileId] as const,
