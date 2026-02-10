@@ -62,6 +62,7 @@ export const TeamSynergySidebar = ({
         gap: '12px',
         position: 'sticky',
         top: '24px',
+        minWidth: '320px',
       }}
     >
       <details>

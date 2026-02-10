@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
-import { usePokemon, usePartyPokemon, useUpdatePokemon, usePokemonInfo, useAddPokemon, usePokemonInfoByName, useSearchPokemon } from '../hooks/usePokemon';
+import { usePokemon, usePartyPokemon, useAddPokemon, usePokemonInfoByName, useSearchPokemon } from '../hooks/usePokemon';
 import { useUpcomingRoutes } from '../hooks/useRoutes';
 import { useUpcomingGyms, useGymProgress } from '../hooks/useGyms';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
-import type { Pokemon } from '../types/pokemon';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
 import type { BasePokemon } from '../types';
 
@@ -15,20 +14,11 @@ export const DashboardPage = () => {
   const gameFileId = currentGameFile?.id ?? null;
 
   const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFileId);
-  const { data: allPokemon = [], isLoading: isLoadingAllPokemon } = usePokemon(gameFileId);
-  const { data: gymProgress = [], isLoading: isLoadingGymProgress } = useGymProgress(gameFileId);
-  const { data: upcomingRoutes = [], isLoading: isLoadingRoutes } = useUpcomingRoutes(gameFileId);
-  const { data: upcomingGyms = [], isLoading: isLoadingGyms } = useUpcomingGyms(gameFileId);
-  const updatePokemonMutation = useUpdatePokemon(gameFileId);
+  const { data: allPokemon = [] } = usePokemon(gameFileId);
+  const { data: gymProgress = [] } = useGymProgress(gameFileId);
+  const { isLoading: isLoadingRoutes } = useUpcomingRoutes(gameFileId);
+  const { data: upcomingGymsResponse, isLoading: isLoadingGyms } = useUpcomingGyms(gameFileId);
   const addPokemonMutation = useAddPokemon(gameFileId);
-
-  const [editingPokemon, setEditingPokemon] = useState<Pokemon | null>(null);
-  const [nickname, setNickname] = useState('');
-  const [levelInput, setLevelInput] = useState('1');
-  const [status, setStatus] = useState<StatusValue | ''>('');
-  const [nature, setNature] = useState<NatureValue | ''>('');
-  const [ability, setAbility] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   // Add Pokemon modal state
   const [showAddPokemonModal, setShowAddPokemonModal] = useState(false);
@@ -46,18 +36,18 @@ export const DashboardPage = () => {
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const isClickingSuggestionRef = useRef(false);
 
-  const nextRoute = upcomingRoutes[0] ?? null;
-  const nextGym = upcomingGyms[0] ?? null;
+  const nextGym = upcomingGymsResponse?.upcoming_gyms?.[0] ?? null;
+  const nextGymLabel = nextGym
+    ? `Gym ${nextGym.gym_number} - ${nextGym.trainer_name || 'Next Gym'}${
+        nextGym.badge_type ? ` (${nextGym.badge_type})` : ''
+      }`
+    : 'No upcoming gyms';
 
   const badgesCount = gymProgress.length;
   const pokedexCount = allPokemon.length;
 
-  const level = parseInt(levelInput, 10) || 0;
   const addLevel = parseInt(addLevelInput, 10) || 0;
 
-  // Fetch base Pokemon info for available abilities when editing
-  const { data: basePokemonInfo } = usePokemonInfo(editingPokemon?.poke_id ?? null);
-  
   // Search Pokemon for autocomplete
   const searchQuery = pokemonNameInput.trim().length >= 1 ? pokemonNameInput.trim() : null;
   const { data: searchResults = [], isLoading: isSearching } = useSearchPokemon(searchQuery, 10);
@@ -69,48 +59,6 @@ export const DashboardPage = () => {
   const { data: addPokemonInfo } = usePokemonInfoByName(
     exactPokemonName && (hasExactMatch || exactPokemonName.length > 3) ? exactPokemonName : null
   );
-
-  const openEditModal = (pokemon: Pokemon) => {
-    setEditingPokemon(pokemon);
-    setNickname(pokemon.nickname || '');
-    setLevelInput(String(pokemon.level));
-    setStatus((pokemon.status as StatusValue) || Status.PARTY);
-    setNature((pokemon.nature as NatureValue) || '');
-    setAbility(pokemon.ability || '');
-    setError(null);
-  };
-
-  const closeEditModal = () => {
-    setEditingPokemon(null);
-    setError(null);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPokemon) return;
-
-    if (level < 1 || level > 100) {
-      setError('Level must be between 1 and 100');
-      return;
-    }
-
-    try {
-      setError(null);
-      await updatePokemonMutation.mutateAsync({
-        pokemonId: editingPokemon.id,
-        update: {
-          nickname: nickname.trim() || null,
-          level,
-          status: status || null,
-          nature: nature || null,
-          ability: ability.trim() || null,
-        },
-      });
-      closeEditModal();
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update Pokemon');
-    }
-  };
 
   const openAddPokemonModal = () => {
     setShowAddPokemonModal(true);
@@ -241,6 +189,7 @@ export const DashboardPage = () => {
         flexDirection: 'column',
         alignItems: 'center',
         gap: '24px',
+        ['--color-border' as any]: '#A89FE6',
       }}
     >
       {/* Navigation Header */}
@@ -420,9 +369,7 @@ export const DashboardPage = () => {
               >
                 <span style={{ fontWeight: 600 }}>Next Gyms</span>
                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-                  {nextGym
-                    ? `Gym ${nextGym.gym_number} - ${nextGym.trainer_name || 'Next Gym'}`
-                    : 'No upcoming gyms'}
+                  {nextGymLabel}
                 </span>
               </button>
 
@@ -581,6 +528,7 @@ export const DashboardPage = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '6px',
+                  position: 'relative',
                 }}
               >
                 <div
@@ -627,277 +575,11 @@ export const DashboardPage = () => {
                 >
                   Lv. {pokemon.level}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openEditModal(pokemon)}
-                  style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    border: '1px solid var(--color-border)',
-                    backgroundColor: 'var(--color-bg-card)',
-                    color: 'var(--color-text-primary)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0,
-                    marginTop: '4px',
-                    fontSize: '14px',
-                    transition: 'all 150ms ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-pokemon-blue)';
-                    e.currentTarget.style.borderColor = 'var(--color-pokemon-blue)';
-                    e.currentTarget.style.color = 'white';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--color-bg-card)';
-                    e.currentTarget.style.borderColor = 'var(--color-border)';
-                    e.currentTarget.style.color = 'var(--color-text-primary)';
-                  }}
-                  title="Edit Pokemon"
-                >
-                  ✏️
-                </button>
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* Edit Modal */}
-      {editingPokemon && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-          }}
-        >
-          <div
-            className="card"
-            style={{
-              width: '100%',
-              maxWidth: '480px',
-              padding: '24px',
-            }}
-          >
-            <h2
-              style={{
-                marginTop: 0,
-                marginBottom: '16px',
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              Edit {editingPokemon.nickname || editingPokemon.name}
-            </h2>
-            <form onSubmit={handleSaveEdit}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '16px',
-                  marginBottom: '16px',
-                }}
-              >
-                <div>
-                  <label
-                    htmlFor="nickname"
-                    style={{
-                      display: 'block',
-                      marginBottom: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Nickname
-                  </label>
-                  <input
-                    id="nickname"
-                    className="input"
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    style={{ width: '100%' }}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="level"
-                    style={{
-                      display: 'block',
-                      marginBottom: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Level
-                  </label>
-                  <input
-                    id="level"
-                    className="input"
-                    type="number"
-                    value={levelInput}
-                    onChange={(e) => setLevelInput(e.target.value)}
-                    style={{
-                      width: '100%',
-                      borderColor:
-                        (level < 1 || level > 100) && levelInput !== '' ? '#F87171' : undefined,
-                      borderWidth:
-                        (level < 1 || level > 100) && levelInput !== '' ? '2px' : undefined,
-                    }}
-                  />
-                  {(level < 1 || level > 100) && levelInput !== '' && (
-                    <p style={{ marginTop: '4px', fontSize: '0.75rem', color: '#F87171' }}>
-                      Level must be between 1 and 100
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="status"
-                    style={{
-                      display: 'block',
-                      marginBottom: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Status
-                  </label>
-                  <select
-                    id="status"
-                    className="input"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as StatusValue | '')}
-                    style={{ width: '100%' }}
-                  >
-                    <option value={Status.PARTY}>Party</option>
-                    <option value={Status.STORED}>Stored</option>
-                    <option value={Status.FAINTED}>Fainted</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="nature"
-                    style={{
-                      display: 'block',
-                      marginBottom: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Nature
-                  </label>
-                  <select
-                    id="nature"
-                    className="input"
-                    value={nature}
-                    onChange={(e) => setNature(e.target.value as NatureValue | '')}
-                    style={{ width: '100%' }}
-                  >
-                    <option value="">None</option>
-                    {Object.values(Nature).map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="ability"
-                    style={{
-                      display: 'block',
-                      marginBottom: '4px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Ability
-                  </label>
-                  {basePokemonInfo?.abilities && basePokemonInfo.abilities.length > 0 ? (
-                    <select
-                      id="ability"
-                      className="input"
-                      value={ability}
-                      onChange={(e) => setAbility(e.target.value)}
-                      style={{ width: '100%' }}
-                    >
-                      <option value="">None</option>
-                      {basePokemonInfo.abilities.map((abil) => (
-                        <option key={abil} value={abil}>
-                          {abil}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      id="ability"
-                      className="input"
-                      type="text"
-                      value={ability}
-                      onChange={(e) => setAbility(e.target.value)}
-                      placeholder="Enter ability"
-                      style={{ width: '100%' }}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {error && (
-                <div
-                  style={{
-                    marginBottom: '12px',
-                    padding: '10px',
-                    backgroundColor: '#FEE2E2',
-                    border: '1px solid #F87171',
-                    borderRadius: '8px',
-                    color: '#B91C1C',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  {error}
-                </div>
-              )}
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '8px',
-                  marginTop: '8px',
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={closeEditModal}
-                  style={{ fontSize: '0.85rem', padding: '8px 14px' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ fontSize: '0.85rem', padding: '8px 14px' }}
-                >
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Add Pokemon Modal */}
       {showAddPokemonModal && (
@@ -970,7 +652,7 @@ export const DashboardPage = () => {
                         setShowSuggestions(true);
                       }
                     }}
-                    onBlur={(e) => {
+                    onBlur={() => {
                       // Delay hiding suggestions to allow clicks
                       setTimeout(() => {
                         if (!isClickingSuggestionRef.current) {

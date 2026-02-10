@@ -337,7 +337,7 @@ export const TeamPage = () => {
       <div
         style={{
           width: '100%',
-          maxWidth: '900px',
+          maxWidth: '1300px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -513,7 +513,7 @@ export const TeamPage = () => {
                   style={{
                     display: 'flex',
                     gap: '8px',
-                    marginTop: '8px',
+                    marginTop: 'auto',
                   }}
                 >
                   <button
@@ -927,7 +927,7 @@ export const TeamPage = () => {
         )}
           </div>
         </div>
-        <div style={{ flex: '0 0 360px', width: '360px' }}>
+        <div style={{ flex: '0 0 420px', width: '420px', paddingTop: '40px' }}>
           <TeamSynergySidebar
             isLoading={isLoadingSynergy}
             isError={isErrorSynergy}

@@ -16,6 +16,8 @@ export interface GymSummary {
   gym_number: string;
   location: string;
   badge_name: string;
+  trainer_name?: string;
+  badge_type?: string;
 }
 
 export interface GymTrainer {
