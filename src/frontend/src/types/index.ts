@@ -4,5 +4,4 @@ export * from './gameFile';
 export * from './pokemon';
 export * from './route';
 export * from './gym';
-
-
+export * from './trainer';
