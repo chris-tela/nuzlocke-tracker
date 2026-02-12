@@ -174,6 +174,7 @@ def _compute_pokemon_stats(
         print(f"  [WARN] Pokemon '{name}' not found in AllPokemon table — skipping stat calc")
         return {
             "name": name,
+            "poke_id": None,
             "level": level,
             "moves": poke_entry.get("moves", []),
             "stats": None,
@@ -205,6 +206,7 @@ def _compute_pokemon_stats(
 
     return {
         "name": name,
+        "poke_id": base.poke_id,
         "level": level,
         "moves": poke_entry.get("moves", []),
         "stats": stats,

@@ -52,10 +52,10 @@ def classify_importance(
     if any(kw in location_lower for kw in ELITE_FOUR_LOCATIONS):
         return ("elite_four", True)
 
-    # Evil team leader/admin
+    # Evil team leader/admin — require both a team name AND a role keyword
     has_team_name = any(team in name_lower for team in EVIL_TEAM_NAMES)
     has_role = any(role in name_lower for role in EVIL_ROLE_KEYWORDS)
-    if has_team_name or has_role:
+    if has_team_name and has_role:
         return ("evil_team_leader", True)
 
     return (None, False)

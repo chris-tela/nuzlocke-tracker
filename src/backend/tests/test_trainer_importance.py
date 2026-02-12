@@ -26,7 +26,12 @@ def test_classify_elite_four():
 
 def test_classify_evil_team():
     assert classify_importance("Team Rocket Boss Giovanni", "Silph Co", set()) == ("evil_team_leader", True)
-    assert classify_importance("Admin Mars", "Galactic HQ", set()) == ("evil_team_leader", True)
+    assert classify_importance("Team Galactic Admin Mars", "Galactic HQ", set()) == ("evil_team_leader", True)
+
+
+def test_classify_evil_team_requires_both_team_and_role():
+    # "Admin Mars" has role but no team name in the name — should NOT flag
+    assert classify_importance("Admin Mars", "Galactic HQ", set()) == (None, False)
 
 
 def test_classify_normal_trainer():
