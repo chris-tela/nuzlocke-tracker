@@ -12,6 +12,7 @@ import type { PokemonCreate } from '../services/pokemonService';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
+import { useTrainersByRoute } from '../hooks/useTrainers';
 
 // Lazy loading image component using Intersection Observer
 const LazyImage = ({ 
@@ -504,6 +505,58 @@ const EncounterCard = memo(({
 
 EncounterCard.displayName = 'EncounterCard';
 
+// Component to display trainer avatars for a route
+function RouteTrainerAvatars({ routeId }: { routeId: number }) {
+  const { data: trainers } = useTrainersByRoute(routeId);
+  const navigate = useNavigate();
+
+  if (!trainers || trainers.length === 0) return null;
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
+      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+        Trainers:
+      </span>
+      {trainers.map((trainer) => (
+        <button
+          key={trainer.id}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/trainers?gameName=${encodeURIComponent(trainer.game_names[0] ?? '')}`);
+          }}
+          title={trainer.trainer_name}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            border: trainer.is_important
+              ? '2px solid var(--color-pokemon-primary)'
+              : '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg-light)',
+            padding: '2px',
+            cursor: 'pointer',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {trainer.trainer_image ? (
+            <img
+              src={trainer.trainer_image}
+              alt={trainer.trainer_name}
+              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+            />
+          ) : (
+            <span style={{ fontSize: '0.6rem' }}>?</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // Component to render a single route with its encounters
 const RouteCard = memo(({
   routeName,
@@ -704,6 +757,11 @@ const RouteCard = memo(({
             })}
           </div>
         </>
+      )}
+
+      {/* Trainer avatars for this route */}
+      {routeEncounters?.route_id != null && (
+        <RouteTrainerAvatars routeId={routeEncounters.route_id} />
       )}
 
       {/* Actions - only show for upcoming routes (not encountered) */}
