@@ -161,6 +161,39 @@ class TeamSynergySummary(BaseModel):
     offense: TeamSynergySection
     defense: TeamSynergySection
 
+# Trainer Schemas
+class TrainerPokemonStats(BaseModel):
+    hp: int
+    attack: int
+    defense: int
+    special_attack: int
+    special_defense: int
+    speed: int
+
+class TrainerPokemon(BaseModel):
+    name: str
+    poke_id: Optional[int] = None
+    level: int
+    moves: List[str] = []
+    stats: Optional[TrainerPokemonStats] = None
+
+class TrainerResponse(BaseModel):
+    id: int
+    generation: int
+    game_names: List[str]
+    trainer_name: str
+    trainer_image: str
+    location: str
+    route_id: Optional[int] = None
+    is_important: bool
+    importance_reason: Optional[str] = None
+    starter_filter: Optional[str] = None
+    battle_order: int
+    pokemon: List[TrainerPokemon]
+
+    class Config:
+        from_attributes = True
+
 # Authentication Schemas
 class UserRegister(BaseModel):
     username: str
