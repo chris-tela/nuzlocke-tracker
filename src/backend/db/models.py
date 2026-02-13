@@ -46,6 +46,7 @@ class AllPokemon(Base):
     poke_id = Column(Integer, primary_key=True, nullable=False)
     name = Column(String, nullable=False)
     types = Column(ARRAY(String), nullable=False)
+    past_types = Column(ARRAY(JSON), nullable=True)
     abilities = Column(ARRAY(String), nullable=False)
     weight = Column(Integer, nullable=False)
     base_hp = Column(Integer, nullable=False)
@@ -167,6 +168,26 @@ class Gym(Base):
     badge_name =  Column(String, nullable=True)
     badge_type = Column(String, nullable=True)
     pokemon = Column(JSON, nullable=False)
+
+
+class Trainer(Base):
+    __tablename__ = "trainer"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    generation = Column(Integer, nullable=False)
+    game_names = Column(ARRAY(String), nullable=False)
+    trainer_name = Column(String, nullable=False)
+    trainer_image = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+    route_id = Column(Integer, ForeignKey("route.id"), nullable=True)
+    is_important = Column(Boolean, nullable=False, default=False)
+    importance_reason = Column(String, nullable=True)
+    starter_filter = Column(String, nullable=True)
+    battle_order = Column(Integer, nullable=False)
+    pokemon = Column(JSON, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+
+    route = relationship("Route")
 
 
 class Type(Base):

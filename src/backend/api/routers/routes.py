@@ -45,7 +45,7 @@ async def get_route_encounters(version_id: int, route_: str, db: Session = Depen
     if route is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Route not found!")
     
-    return {"route": route.name, "data": route.data}
+    return {"route": route.name, "data": route.data, "route_id": route.id}
 
     
     

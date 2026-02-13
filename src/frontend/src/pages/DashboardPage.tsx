@@ -416,6 +416,49 @@ export const DashboardPage = () => {
                 </span>
               </button>
 
+              {/* View Trainers button */}
+              <button
+                type="button"
+                onClick={() => navigate(`/trainers?gameName=${encodeURIComponent(currentGameFile?.game_name ?? '')}`)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg-light)',
+                  color: 'var(--color-text-primary)',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                  fontSize: '0.9rem',
+                  transition: 'all 150ms ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-pokemon-primary)';
+                  e.currentTarget.style.borderColor = 'var(--color-pokemon-primary)';
+                  e.currentTarget.style.color = 'white';
+                  const spans = e.currentTarget.querySelectorAll('span');
+                  spans.forEach((span) => {
+                    (span as HTMLElement).style.color = 'rgba(255, 255, 255, 0.95)';
+                  });
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-light)';
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.color = 'var(--color-text-primary)';
+                  const spans = e.currentTarget.querySelectorAll('span');
+                  spans[0].style.color = '';
+                  (spans[1] as HTMLElement).style.color = 'var(--color-text-secondary)';
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>View Trainers</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                  Browse all trainers & key battles
+                </span>
+              </button>
+
               {/* Add Pokemon button */}
               <button
                 type="button"

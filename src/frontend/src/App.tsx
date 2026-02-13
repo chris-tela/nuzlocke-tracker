@@ -12,6 +12,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TeamPage } from './pages/TeamPage';
 import { RoutesPage } from './pages/RoutesPage';
 import { GymsPage } from './pages/GymsPage';
+import { TrainersPage } from './pages/TrainersPage';
 import { IconLegendPage } from './pages/IconLegendPage';
 import './App.css';
 
@@ -107,6 +108,14 @@ function App() {
           element={
             <ProtectedRoute>
               <GymsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trainers"
+          element={
+            <ProtectedRoute>
+              <TrainersPage />
             </ProtectedRoute>
           }
         />

@@ -1,9 +1,7 @@
 # initalizes database tables
 
 from database import engine
-
-# remove models that you don't want to reinitialize
-from models import  Base
+from models import Base
 
 
 Base.metadata.create_all(bind=engine)

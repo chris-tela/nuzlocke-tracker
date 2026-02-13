@@ -54,7 +54,7 @@ export const useRouteEncounters = (route: string | number | null, gameName: stri
       } catch (error: any) {
         // Handle 404s gracefully - some routes (gyms, special locations) don't have encounter data
         if (error?.response?.status === 404) {
-          return { route: route as string, data: [] };
+          return { route: route as string, data: [], route_id: null as number | null };
         }
         throw error;
       }

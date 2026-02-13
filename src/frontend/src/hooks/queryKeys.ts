@@ -28,6 +28,14 @@ export const queryKeys = {
   upcomingGyms: (gameFileId: number) => ['gyms', gameFileId, 'upcoming'] as const,
   versionGyms: (versionName: string) => ['gyms', 'version', versionName] as const,
   
+  // Trainer queries
+  trainers: (gameName: string, starter?: string) =>
+    ['trainers', gameName, starter ?? 'all'] as const,
+  importantTrainers: (gameName: string, starter?: string) =>
+    ['trainers', gameName, 'important', starter ?? 'all'] as const,
+  trainersByRoute: (routeId: number, starter?: string) =>
+    ['trainers', 'route', routeId, starter ?? 'all'] as const,
+
   // Version queries
   versions: ['versions'] as const,
   version: (versionName: string) => ['versions', versionName] as const,
