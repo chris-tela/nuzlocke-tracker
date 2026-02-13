@@ -6,8 +6,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
 import { useVersionStarters } from '../hooks/usePokemon';
-import { useAddPokemon } from '../hooks/usePokemon';
-import { getGameFile } from '../services/gameFileService';
+import { addPokemon } from '../services/pokemonService';
+import { createGameFile, getGameFile, updateGameFile } from '../services/gameFileService';
 import { Nature, Status } from '../types/enums';
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
@@ -16,6 +16,10 @@ export const StarterSelectionPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const gameFileId = parseInt(searchParams.get('gameFileId') || '0', 10);
+  const pendingTrainerName = (searchParams.get('trainerName') || '').trim();
+  const pendingGameName = (searchParams.get('gameName') || '').trim();
+  const hasPendingCreation = !!pendingTrainerName && !!pendingGameName;
+  const hasExistingGameFile = gameFileId > 0;
   const { currentGameFile, setCurrentGameFile } = useGameFile();
   const [selectedStarter, setSelectedStarter] = useState<number | null>(null);
   const [nickname, setNickname] = useState('');
@@ -25,7 +29,7 @@ export const StarterSelectionPage = () => {
   const [levelInput, setLevelInput] = useState<string>('5');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoadingGameFile, setIsLoadingGameFile] = useState(true); // Start as true to show loading initially
+  const [isLoadingGameFile, setIsLoadingGameFile] = useState(hasExistingGameFile); // Start as true only for existing game file flow
 
   // Convert levelInput to number for validation and submission
   const level = parseInt(levelInput, 10) || 0;
@@ -40,9 +44,13 @@ export const StarterSelectionPage = () => {
 
   // Load game file if not already loaded or if it doesn't match the URL param
   useEffect(() => {
-    if (!gameFileId || gameFileId === 0) {
-      // Invalid gameFileId, redirect back
-      navigate('/game-files');
+    if (hasPendingCreation) {
+      setIsLoadingGameFile(false);
+      return;
+    }
+
+    if (!hasExistingGameFile) {
+      setIsLoadingGameFile(false);
       return;
     }
 
@@ -66,11 +74,10 @@ export const StarterSelectionPage = () => {
       // Game file is already loaded and matches
       setIsLoadingGameFile(false);
     }
-  }, [gameFileId, currentGameFile, setCurrentGameFile, navigate]);
+  }, [gameFileId, hasExistingGameFile, hasPendingCreation, currentGameFile, setCurrentGameFile]);
 
-  const gameName = currentGameFile?.game_name || '';
+  const gameName = hasPendingCreation ? pendingGameName : (currentGameFile?.game_name || '');
   const { data: starters = [], isLoading: isLoadingStarters } = useVersionStarters(gameName || null);
-  const addPokemonMutation = useAddPokemon(gameFileId > 0 ? gameFileId : null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,14 +88,35 @@ export const StarterSelectionPage = () => {
       return;
     }
 
-    if (!gameFileId) {
-      setError('Game file ID is missing');
+    if (!hasPendingCreation && !hasExistingGameFile) {
+      setError('Game file information is missing');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await addPokemonMutation.mutateAsync({
+      const starterName = selectedStarterData?.name;
+      if (!starterName) {
+        setError('Starter selection is invalid');
+        return;
+      }
+
+      let targetGameFileId = gameFileId;
+
+      if (hasPendingCreation) {
+        const newGameFile = await createGameFile({
+          trainer_name: pendingTrainerName,
+          game_name: pendingGameName,
+          starter_pokemon: starterName,
+        });
+        targetGameFileId = newGameFile.id;
+        setCurrentGameFile(newGameFile);
+      } else {
+        const updated = await updateGameFile(gameFileId, { starter_pokemon: starterName });
+        setCurrentGameFile(updated);
+      }
+
+      await addPokemon(targetGameFileId, {
         poke_id: selectedStarter,
         nickname: nickname.trim() || null,
         nature: nature || null,
@@ -100,7 +128,7 @@ export const StarterSelectionPage = () => {
       });
 
       // Navigate to dashboard after successful starter selection (per Phase 4.3)
-      navigate(`/dashboard?gameFileId=${gameFileId}`, { replace: true });
+      navigate(`/dashboard?gameFileId=${targetGameFileId}`, { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Failed to add starter Pokemon');
     } finally {
@@ -110,8 +138,8 @@ export const StarterSelectionPage = () => {
 
   const selectedStarterData = starters.find((s) => s.poke_id === selectedStarter);
 
-  // Show loading state while game file is being loaded
-  if (!gameFileId || gameFileId === 0) {
+  // Show invalid state only if neither flow has required data.
+  if (!hasPendingCreation && !hasExistingGameFile) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -121,7 +149,7 @@ export const StarterSelectionPage = () => {
         alignItems: 'center',
       }}>
         <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
-          <p style={{ color: 'var(--color-text-secondary)' }}>Invalid game file</p>
+          <p style={{ color: 'var(--color-text-secondary)' }}>Missing game setup data</p>
           <button
             onClick={() => navigate('/game-files')}
             className="btn btn-primary"
@@ -134,7 +162,7 @@ export const StarterSelectionPage = () => {
     );
   }
 
-  if (isLoadingGameFile || !currentGameFile || !gameName) {
+  if (isLoadingGameFile || (hasExistingGameFile && !currentGameFile) || !gameName) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -490,20 +518,6 @@ export const StarterSelectionPage = () => {
                     </select>
                   </div>
                 </div>
-
-                {error && (
-                  <div style={{
-                    marginBottom: '20px',
-                    padding: '12px',
-                    backgroundColor: '#FEE2E2',
-                    border: '2px solid #F87171',
-                    borderRadius: '8px',
-                    color: '#991B1B',
-                    fontSize: '14px',
-                  }}>
-                    {error}
-                  </div>
-                )}
 
                 <div style={{
                   display: 'flex',

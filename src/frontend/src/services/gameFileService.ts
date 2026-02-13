@@ -8,6 +8,7 @@ import type { GameFile } from '../types';
 export interface GameFileCreate {
   trainer_name: string;
   game_name: string;
+  starter_pokemon?: string | null;
 }
 
 /**

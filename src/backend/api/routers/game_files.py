@@ -6,9 +6,17 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from ...db import models
 from ..dependencies import get_db, get_current_user
-from ..schemas import GameFileCreate, GameFileResponse
+from ..schemas import GameFileCreate, GameFileResponse, GameFileUpdate
 
 router = APIRouter()
+
+
+def _to_game_file_response(game_file: models.GameFiles) -> GameFileResponse:
+    """Map legacy DB column starter_selected to starter_pokemon response field."""
+    response = GameFileResponse.model_validate(game_file)
+    if response.starter_pokemon is None:
+        response.starter_pokemon = game_file.starter_selected
+    return response
 
 @router.post("", response_model=GameFileResponse, status_code=status.HTTP_201_CREATED)
 async def create_game_file(
@@ -38,6 +46,7 @@ async def create_game_file(
         user_id=user.id,
         trainer_name=trainer_name,
         game_name=game_name,
+        starter_selected=gamefile.starter_pokemon,
         gym_progress=[],
         route_progress=[]
     )
@@ -46,7 +55,7 @@ async def create_game_file(
     db.commit()
     db.refresh(new_game_file)
     
-    return GameFileResponse.model_validate(new_game_file)
+    return _to_game_file_response(new_game_file)
 
 # get list of game files for a given user
 @router.get("", response_model = list[GameFileResponse], status_code = status.HTTP_200_OK)
@@ -61,7 +70,7 @@ async def get_game_files(
     if game_files is None:
         raise HTTPException(404, "No game files associated with user!")
     # return list of game files
-    return [GameFileResponse.model_validate(gf) for gf in game_files]
+    return [_to_game_file_response(gf) for gf in game_files]
 
 # get game file 
 @router.get("/{game_file_id}", response_model = GameFileResponse, status_code = status.HTTP_200_OK)
@@ -76,10 +85,32 @@ async def get_game_file(game_file_id: int, user: models.User = Depends(get_curre
     if game_file.user_id is not user.id:
         raise HTTPException(403, "Game File ID not associated with User's account!")
     
-    return GameFileResponse.model_validate(game_file)
+    return _to_game_file_response(game_file)
         
 
-# @router.put("/{game_file_id}")
+@router.put("/{game_file_id}", response_model=GameFileResponse, status_code=status.HTTP_200_OK)
+async def update_game_file(
+    game_file_id: int,
+    update: GameFileUpdate,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update a game file (trainer name, game name, or starter_pokemon)."""
+    game_file = db.query(models.GameFiles).filter(models.GameFiles.id == game_file_id).first()
+    if game_file is None:
+        raise HTTPException(status_code=404, detail="Game File Not Found!")
+    if game_file.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Game File not associated with user!")
+    if update.trainer_name is not None:
+        game_file.trainer_name = update.trainer_name.strip()
+    if update.game_name is not None:
+        game_file.game_name = update.game_name.strip()
+    if update.starter_pokemon is not None:
+        game_file.starter_selected = update.starter_pokemon.strip() or None
+    db.commit()
+    db.refresh(game_file)
+    return _to_game_file_response(game_file)
+
 
 @router.delete("/{game_file_id}")
 async def delete_game_file(game_file_id: int, user: models.User = Depends(get_current_user),

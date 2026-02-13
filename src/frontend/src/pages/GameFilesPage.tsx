@@ -10,9 +10,7 @@ import { usePartyPokemon } from '../hooks/usePokemon';
 import { useGymProgress } from '../hooks/useGyms';
 import { usePokemon } from '../hooks/usePokemon';
 import { useVersions } from '../hooks/useVersions';
-import { getGameFiles, createGameFile, deleteGameFile } from '../services/gameFileService';
-import { getPokemon } from '../services/pokemonService';
-import { useQueryClient } from '@tanstack/react-query';
+import { getGameFiles, deleteGameFile } from '../services/gameFileService';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
 
 export const GameFilesPage = () => {
@@ -25,7 +23,6 @@ export const GameFilesPage = () => {
   const [selectedGame, setSelectedGame] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   // Load game files on mount
   useEffect(() => {
@@ -77,33 +74,14 @@ export const GameFilesPage = () => {
 
     setIsCreating(true);
     try {
-      const newGameFile = await createGameFile({
-        trainer_name: trainerName.trim(),
-        game_name: selectedGame,
+      // Do not create the game file yet; move to starter selection first.
+      const params = new URLSearchParams({
+        trainerName: trainerName.trim(),
+        gameName: selectedGame,
       });
-      
-      // Refresh game files list
-      const updatedFiles = await getGameFiles();
-      setGameFiles(updatedFiles);
-      setCurrentGameFile(newGameFile);
-      
-      // Check if game file has any Pokemon
-      const pokemon = await getPokemon(newGameFile.id);
-      
-      // Reset form
-      setTrainerName('');
-      setSelectedGame('');
-      setShowCreateForm(false);
-      
-      // If no Pokemon, route to starter selection
-      if (pokemon.length === 0) {
-        navigate(`/starters?gameFileId=${newGameFile.id}`);
-      } else {
-        // Otherwise, just stay on this page with the new game file selected
-        queryClient.invalidateQueries({ queryKey: ['gameFiles'] });
-      }
+      navigate(`/starters?${params.toString()}`);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to create game file');
+      setError(err?.response?.data?.detail || 'Failed to continue to starter selection');
     } finally {
       setIsCreating(false);
     }
@@ -350,7 +328,7 @@ export const GameFilesPage = () => {
                 padding: '14px 24px',
               }}
             >
-              {isCreating ? 'Creating...' : 'Create Game File'}
+              {isCreating ? 'Loading...' : 'Next'}
             </button>
           </form>
         </div>
@@ -530,6 +508,41 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
       }}>
         {formatGameName(gameFile.game_name)}
       </div>
+
+      {/* Starter Pokemon */}
+      {gameFile.starter_pokemon && (
+        <div style={{
+          color: 'var(--color-text-secondary)',
+          fontSize: '11px',
+          marginBottom: '8px',
+          fontFamily: 'var(--font-pokemon)',
+          lineHeight: '1.4',
+          letterSpacing: '0px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <span>Starter:</span>
+          {getPokemonSpritePath(gameFile.starter_pokemon) ? (
+            <img
+              src={getPokemonSpritePath(gameFile.starter_pokemon)}
+              alt={gameFile.starter_pokemon}
+              style={{
+                width: '24px',
+                height: '24px',
+                objectFit: 'contain',
+                imageRendering: 'pixelated',
+              }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : null}
+          <span style={{ textTransform: 'capitalize' }}>
+            {gameFile.starter_pokemon.replace(/-/g, ' ')}
+          </span>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={{

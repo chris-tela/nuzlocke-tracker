@@ -34,13 +34,22 @@ class UserUpdate(BaseModel):
 class GameFileBase(BaseModel):
     trainer_name: str
     game_name: str
+    starter_pokemon: Optional[str] = None
 
 class GameFileCreate(GameFileBase):
     pass
 
+class GameFileUpdate(BaseModel):
+    """Schema for partial update of a game file."""
+    trainer_name: Optional[str] = None
+    game_name: Optional[str] = None
+    starter_pokemon: Optional[str] = None
+
 class GameFileResponse(GameFileBase):
     id: int
     user_id: int
+    starter_selected: Optional[str] = None
+    starter_pokemon: Optional[str] = None
     gym_progress: Optional[List[Dict[str, Any]]] = None
     route_progress: Optional[List[str]] = None
     created_at: Optional[datetime] = None

@@ -101,6 +101,7 @@ class GameFiles(Base):
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     trainer_name = Column(String, nullable=False)
     game_name = Column(String, nullable=False)
+    starter_selected = Column(String, nullable=True)
     owned_pokemon = relationship("OwnedPokemon", back_populates="game_file", cascade="all, delete")
     gym_progress = Column(ARRAY(JSON), nullable=True)
     route_progress = Column(ARRAY(JSON), nullable=True)
