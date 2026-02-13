@@ -13,6 +13,7 @@ export interface RouteListResponse {
 export interface RouteDetailResponse {
   route: string;
   data: unknown[]; // Encounter data array
+  route_id: number | null; // Database route primary key (null for 404 fallbacks)
 }
 
 export interface RouteProgressApiResponse {

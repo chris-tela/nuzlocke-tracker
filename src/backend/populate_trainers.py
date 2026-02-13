@@ -213,10 +213,6 @@ def _compute_pokemon_stats(
     }
 
 
-# ---------------------------------------------------------------------------
-# Main population logic
-# ---------------------------------------------------------------------------
-
 def populate(db: Session) -> None:
     pokemon_map = _build_pokemon_map(db)
     if not pokemon_map:
@@ -225,7 +221,7 @@ def populate(db: Session) -> None:
 
     print(f"Loaded {len(pokemon_map)} pokemon from AllPokemon table.")
 
-    # Wipe existing Trainer rows for idempotent re-runs.
+    # Wipe existing Trainer rows for re-runs.
     deleted = db.query(Trainer).delete()
     db.commit()
     print(f"Cleared {deleted} existing Trainer rows.")
