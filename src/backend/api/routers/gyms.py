@@ -101,6 +101,7 @@ async def get_upcoming_gyms(game_file_id: int, user: models.User = Depends(get_c
     upcoming_gyms = [
         {
             "gym_number": gym.gym_number,
+            "gym_path": gym.gym_path,
             "location": gym.location,
             "trainer_name": gym.trainer_name,
             "trainer_image": gym.trainer_image,

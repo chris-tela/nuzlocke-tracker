@@ -49,8 +49,13 @@ SCRAPE_SPRITE_PREFIX = {
 # Badge image URLs (full-resolution from Bulbapedia archives)
 # Format: https://archives.bulbagarden.net/media/upload/{path}/{Name}_Badge.png
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Badge images are stored as {game_name}_{gym#}.webp where game_name matches
+# the Gym table's game_name column (PokeAPI version names).
+# ---------------------------------------------------------------------------
+
+# Unique badge images to download (badge_name -> Bulbapedia URL).
 BADGE_URLS = {
-    # Kanto
     "Boulder Badge": "https://archives.bulbagarden.net/media/upload/d/dd/Boulder_Badge.png",
     "Cascade Badge": "https://archives.bulbagarden.net/media/upload/9/9c/Cascade_Badge.png",
     "Thunder Badge": "https://archives.bulbagarden.net/media/upload/a/a6/Thunder_Badge.png",
@@ -59,7 +64,6 @@ BADGE_URLS = {
     "Marsh Badge": "https://archives.bulbagarden.net/media/upload/6/6b/Marsh_Badge.png",
     "Volcano Badge": "https://archives.bulbagarden.net/media/upload/1/12/Volcano_Badge.png",
     "Earth Badge": "https://archives.bulbagarden.net/media/upload/7/78/Earth_Badge.png",
-    # Johto
     "Zephyr Badge": "https://archives.bulbagarden.net/media/upload/4/4a/Zephyr_Badge.png",
     "Hive Badge": "https://archives.bulbagarden.net/media/upload/0/08/Hive_Badge.png",
     "Plain Badge": "https://archives.bulbagarden.net/media/upload/a/a7/Plain_Badge.png",
@@ -68,7 +72,6 @@ BADGE_URLS = {
     "Mineral Badge": "https://archives.bulbagarden.net/media/upload/7/7b/Mineral_Badge.png",
     "Glacier Badge": "https://archives.bulbagarden.net/media/upload/e/e6/Glacier_Badge.png",
     "Rising Badge": "https://archives.bulbagarden.net/media/upload/5/58/Rising_Badge.png",
-    # Hoenn
     "Stone Badge": "https://archives.bulbagarden.net/media/upload/6/63/Stone_Badge.png",
     "Knuckle Badge": "https://archives.bulbagarden.net/media/upload/9/97/Knuckle_Badge.png",
     "Dynamo Badge": "https://archives.bulbagarden.net/media/upload/3/34/Dynamo_Badge.png",
@@ -77,7 +80,6 @@ BADGE_URLS = {
     "Feather Badge": "https://archives.bulbagarden.net/media/upload/6/62/Feather_Badge.png",
     "Mind Badge": "https://archives.bulbagarden.net/media/upload/c/cc/Mind_Badge.png",
     "Rain Badge": "https://archives.bulbagarden.net/media/upload/9/9b/Rain_Badge.png",
-    # Sinnoh
     "Coal Badge": "https://archives.bulbagarden.net/media/upload/0/0b/Coal_Badge.png",
     "Forest Badge": "https://archives.bulbagarden.net/media/upload/8/8c/Forest_Badge.png",
     "Cobble Badge": "https://archives.bulbagarden.net/media/upload/2/27/Cobble_Badge.png",
@@ -86,7 +88,6 @@ BADGE_URLS = {
     "Mine Badge": "https://archives.bulbagarden.net/media/upload/f/fe/Mine_Badge.png",
     "Icicle Badge": "https://archives.bulbagarden.net/media/upload/0/09/Icicle_Badge.png",
     "Beacon Badge": "https://archives.bulbagarden.net/media/upload/0/0c/Beacon_Badge.png",
-    # Unova (BW)
     "Trio Badge": "https://archives.bulbagarden.net/media/upload/7/74/Trio_Badge.png",
     "Basic Badge": "https://archives.bulbagarden.net/media/upload/8/85/Basic_Badge.png",
     "Insect Badge": "https://archives.bulbagarden.net/media/upload/8/8a/Insect_Badge.png",
@@ -95,11 +96,68 @@ BADGE_URLS = {
     "Jet Badge": "https://archives.bulbagarden.net/media/upload/9/9c/Jet_Badge.png",
     "Freeze Badge": "https://archives.bulbagarden.net/media/upload/a/ac/Freeze_Badge.png",
     "Legend Badge": "https://archives.bulbagarden.net/media/upload/c/c0/Legend_Badge.png",
-    # Unova (B2W2)
     "Toxic Badge": "https://archives.bulbagarden.net/media/upload/3/3e/Toxic_Badge.png",
     "Wave Badge": "https://archives.bulbagarden.net/media/upload/0/00/Wave_Badge.png",
-    # Extra (if referenced in scrape data)
-    "Beetle Badge": "https://archives.bulbagarden.net/media/upload/8/8a/Insect_Badge.png",
+}
+
+# Ordered badge names for each region (gym 1 through 8).
+_KANTO_BADGES = [
+    "Boulder Badge", "Cascade Badge", "Thunder Badge", "Rainbow Badge",
+    "Soul Badge", "Marsh Badge", "Volcano Badge", "Earth Badge",
+]
+_JOHTO_BADGES = [
+    "Zephyr Badge", "Hive Badge", "Plain Badge", "Fog Badge",
+    "Storm Badge", "Mineral Badge", "Glacier Badge", "Rising Badge",
+]
+_HOENN_BADGES = [
+    "Stone Badge", "Knuckle Badge", "Dynamo Badge", "Heat Badge",
+    "Balance Badge", "Feather Badge", "Mind Badge", "Rain Badge",
+]
+_SINNOH_BADGES = [
+    "Coal Badge", "Forest Badge", "Cobble Badge", "Fen Badge",
+    "Relic Badge", "Mine Badge", "Icicle Badge", "Beacon Badge",
+]
+_BW_BADGES = [
+    "Trio Badge", "Basic Badge", "Insect Badge", "Bolt Badge",
+    "Quake Badge", "Jet Badge", "Freeze Badge", "Legend Badge",
+]
+_B2W2_BADGES = [
+    "Basic Badge", "Toxic Badge", "Insect Badge", "Bolt Badge",
+    "Quake Badge", "Jet Badge", "Legend Badge", "Wave Badge",
+]
+
+# Maps game_name (PokeAPI version name) -> list of badge names in gym order.
+# HGSS gets gyms 1-8 (Johto) + 9-16 (Kanto).
+GAME_BADGE_ORDER: dict[str, list[str]] = {
+    "red": _KANTO_BADGES, "blue": _KANTO_BADGES,
+    "yellow": _KANTO_BADGES,
+    "gold": _JOHTO_BADGES, "silver": _JOHTO_BADGES,
+    "crystal": _JOHTO_BADGES,
+    "ruby": _HOENN_BADGES, "sapphire": _HOENN_BADGES,
+    "emerald": _HOENN_BADGES,
+    "firered": _KANTO_BADGES, "leafgreen": _KANTO_BADGES,
+    "diamond": _SINNOH_BADGES, "pearl": _SINNOH_BADGES,
+    "platinum": _SINNOH_BADGES,
+    "heartgold": _JOHTO_BADGES + _KANTO_BADGES,
+    "soulsilver": _JOHTO_BADGES + _KANTO_BADGES,
+    "black": _BW_BADGES, "white": _BW_BADGES,
+    "black-2": _B2W2_BADGES, "white-2": _B2W2_BADGES,
+}
+
+# Maps scrape filename -> list of game_names that share this data file.
+# The first game_name is used as the "primary" for badge_image in the JSON.
+SCRAPE_GAME_NAMES: dict[str, list[str]] = {
+    "red-blue_trainers.json": ["red", "blue"],
+    "yellow_trainers.json": ["yellow"],
+    "gold-silver_trainers.json": ["gold", "silver"],
+    "crystal_trainers.json": ["crystal"],
+    "ruby-sapphire_trainers.json": ["ruby", "sapphire"],
+    "firered-leafgreen_trainers.json": ["firered", "leafgreen"],
+    "diamond-pearl_trainers.json": ["diamond", "pearl"],
+    "platinum_trainers.json": ["platinum"],
+    "heartgold-soulsilver_trainers.json": ["heartgold", "soulsilver"],
+    "black-white_trainers.json": ["black", "white"],
+    "black-white-2_trainers.json": ["black-2", "white-2"],
 }
 
 HEADERS = {
@@ -113,38 +171,67 @@ HEADERS = {
 
 def download_badges() -> dict[str, str]:
     """
-    Download all badge images from Bulbapedia, convert to webp,
-    save to BADGES_DIR. Returns badge_name -> relative path map.
+    Download unique badge images from Bulbapedia, then create per-game copies
+    as {game_name}_{gym#}.webp.  Returns file_stem -> relative path map for
+    all created files.
     """
+    import shutil
+
     BADGES_DIR.mkdir(parents=True, exist_ok=True)
-    badge_paths: dict[str, str] = {}
 
+    # Step 1: Download unique badge images (keyed by badge name).
+    badge_data: dict[str, bytes] = {}
     for badge_name, url in BADGE_URLS.items():
-        filename = badge_name.lower().replace(" ", "_") + ".webp"
-        out_path = BADGES_DIR / filename
-        rel_path = f"../data/badges/{filename}"
+        # Use first existing game file as cache check.
+        # If any game copy exists, read it instead of re-downloading.
+        cached = False
+        for game_name, badges in GAME_BADGE_ORDER.items():
+            if badge_name in badges:
+                gym_num = badges.index(badge_name) + 1
+                cache_path = BADGES_DIR / f"{game_name}_{gym_num}.webp"
+                if cache_path.exists():
+                    badge_data[badge_name] = cache_path.read_bytes()
+                    cached = True
+                    break
 
-        if out_path.exists():
-            print(f"  [SKIP] {badge_name} — already exists")
-            badge_paths[badge_name] = rel_path
+        if cached:
+            print(f"  [CACHED] {badge_name}")
             continue
 
         try:
             print(f"  Downloading {badge_name}...")
             resp = requests.get(url, headers=HEADERS, timeout=15)
             resp.raise_for_status()
-
             img = Image.open(BytesIO(resp.content))
-            img.save(str(out_path), "WEBP", quality=90)
-            badge_paths[badge_name] = rel_path
-            print(f"    -> {filename} ({out_path.stat().st_size} bytes)")
-
-            time.sleep(0.5)  # Be polite to Bulbapedia
-
+            buf = BytesIO()
+            img.save(buf, "WEBP", quality=90)
+            badge_data[badge_name] = buf.getvalue()
+            time.sleep(0.5)
         except Exception as e:
             print(f"  [ERROR] {badge_name}: {e}")
-            badge_paths[badge_name] = ""
 
+    # Step 2: Create {game_name}_{gym#}.webp files for every game.
+    badge_paths: dict[str, str] = {}
+    created = 0
+    for game_name, badges in GAME_BADGE_ORDER.items():
+        for gym_num_0, badge_name in enumerate(badges):
+            gym_num = gym_num_0 + 1
+            file_stem = f"{game_name}_{gym_num}"
+            filename = f"{file_stem}.webp"
+            out_path = BADGES_DIR / filename
+            rel_path = f"../data/badges/{filename}"
+
+            if badge_name not in badge_data:
+                print(f"  [SKIP] {file_stem} — no image for {badge_name}")
+                continue
+
+            if not out_path.exists():
+                out_path.write_bytes(badge_data[badge_name])
+                created += 1
+
+            badge_paths[file_stem] = rel_path
+
+    print(f"  Created {created} new badge files ({len(badge_paths)} total).")
     return badge_paths
 
 
@@ -216,13 +303,17 @@ def _resolve_sprite(trainer_name: str, prefix: str, sprite_lookup: dict[str, str
 def rewrite_scrape_files(badge_paths: dict[str, str]) -> None:
     """
     Iterate each scrape JSON, update trainer_image to local paths,
-    add badge_image attribute.
+    add badge_image attribute using {game_name}_{gym#} naming.
     """
     for filename in sorted(TRAINER_DATA_DIR.glob("*.json")):
         prefix = SCRAPE_SPRITE_PREFIX.get(filename.name, "")
         sprite_lookup = _build_sprite_lookup(prefix) if prefix else {}
 
-        print(f"\n--- {filename.name} (prefix={prefix}, sprites={len(sprite_lookup)}) ---")
+        # Use the first game_name for this scrape file as the badge prefix.
+        game_names = SCRAPE_GAME_NAMES.get(filename.name, [])
+        primary_game = game_names[0] if game_names else ""
+
+        print(f"\n--- {filename.name} (prefix={prefix}, game={primary_game}, sprites={len(sprite_lookup)}) ---")
 
         with open(filename, "r", encoding="utf-8") as f:
             entries = json.load(f)
@@ -230,7 +321,6 @@ def rewrite_scrape_files(badge_paths: dict[str, str]) -> None:
         updated = 0
         for entry in entries:
             # Update trainer_image
-            old_image = entry.get("trainer_image", "")
             trainer_name = entry.get("trainer_name", "")
             new_image = _resolve_sprite(trainer_name, prefix, sprite_lookup)
 
@@ -239,9 +329,13 @@ def rewrite_scrape_files(badge_paths: dict[str, str]) -> None:
                 updated += 1
             # If no local match, keep the old URL as fallback
 
-            # Add badge_image
-            badge_name = entry.get("badge_name", "")
-            entry["badge_image"] = badge_paths.get(badge_name, "")
+            # Add badge_image using {game_name}_{gym#} naming.
+            gym_number = entry.get("gym_number", "")
+            if primary_game and gym_number:
+                file_stem = f"{primary_game}_{gym_number}"
+                entry["badge_image"] = badge_paths.get(file_stem, "")
+            else:
+                entry["badge_image"] = ""
 
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(entries, f, indent=2, ensure_ascii=False)
