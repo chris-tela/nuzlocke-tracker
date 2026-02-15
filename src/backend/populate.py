@@ -580,11 +580,60 @@ def get_damage_relations(relations_dict: dict):
 
     try:
         for key, relation_list in relations_dict.items():  # loop over "double_damage_from", etc.
-            for relation in relation_list:                
-                relation.pop("url", None)     
+            for relation in relation_list:
+                relation.pop("url", None)
     except Exception:
-        pass        
+        pass
     return relations_dict
+
+
+@app.post("/populate/moves")
+def populate_moves(db: Session = Depends(database.get_db)):
+    listing = requests.get("https://pokeapi.co/api/v2/move?limit=1000").json()
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Moves listing not found!")
+
+    try:
+        for move_entry in listing["results"]:
+            move_data = requests.get(move_entry["url"]).json()
+            move_id = move_data["id"]
+
+            # Idempotency — skip if already exists
+            existing = db.query(models.Move).filter(models.Move.id == move_id).first()
+            if existing:
+                continue
+
+            # Extract English short_effect
+            effect = None
+            for entry in move_data.get("effect_entries", []):
+                if entry["language"]["name"] == "en":
+                    effect = entry["short_effect"]
+                    break
+
+            move = models.Move(
+                id=move_id,
+                name=move_data["name"],
+                type_name=move_data["type"]["name"],
+                power=move_data["power"],
+                pp=move_data["pp"],
+                accuracy=move_data["accuracy"],
+                damage_class=move_data["damage_class"]["name"],
+                effect=effect,
+                generation=int(move_data["generation"]["url"].split("/")[-2]),
+                priority=move_data["priority"],
+            )
+            db.add(move)
+
+            if move_id % 50 == 0:
+                db.commit()
+                print(f"Committed moves up to ID {move_id}")
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing moves: {e}")
+
+    db.commit()
+    db.close()
+    return {"message": "Moves populated successfully!"}
 
 
 

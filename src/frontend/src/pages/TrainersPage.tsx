@@ -1,16 +1,13 @@
-/**
- * Trainers Page
- * Shows all trainers for the current game grouped by location,
- * with important trainers pinned at the top as "Key Battles".
- */
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
-import { useTrainersByGame, useImportantTrainers } from '../hooks/useTrainers';
+import { useTrainersByGame } from '../hooks/useTrainers';
+import { usePartyPokemon } from '../hooks/usePokemon';
 import { TrainerCard } from '../components/TrainerCard';
 import type { Trainer } from '../types/trainer';
 
-const SECTIONS_PER_PAGE = 15;
+const TRAINERS_PER_PAGE = 20;
+type ScopeMode = 'all' | 'important';
 
 export const TrainersPage = () => {
   const navigate = useNavigate();
@@ -18,70 +15,72 @@ export const TrainersPage = () => {
   const { currentGameFile } = useGameFile();
 
   const gameName = currentGameFile?.game_name ?? searchParams.get('gameName') ?? null;
+  const gameFileId = currentGameFile?.id ?? null;
   const starter: string | undefined = undefined; // TODO: currentGameFile?.starter_selected
 
   const { data: allTrainers = [], isLoading: isLoadingAll } = useTrainersByGame(gameName, starter);
-  const { data: importantTrainers = [], isLoading: isLoadingImportant } = useImportantTrainers(gameName, starter);
+  const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFileId);
+  const [scopeMode, setScopeMode] = useState<ScopeMode>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [displayedTrainerCount, setDisplayedTrainerCount] = useState(TRAINERS_PER_PAGE);
 
-  // Accordion state: which locations are expanded
-  const [expandedLocations, setExpandedLocations] = useState<Set<string>>(new Set());
-
-  // Load-more pagination state
-  const [displayedSectionCount, setDisplayedSectionCount] = useState(SECTIONS_PER_PAGE);
-
-  // Build a Set of important trainer IDs for quick lookup
-  const importantTrainerIds = useMemo(() => {
-    return new Set(importantTrainers.map((t) => t.id));
-  }, [importantTrainers]);
-
-  // Group trainers by location, preserving insertion order (battle_order)
-  const locationGroups = useMemo(() => {
-    const groups = new Map<string, Trainer[]>();
-    for (const trainer of allTrainers) {
-      const loc = trainer.location || 'Unknown';
-      if (!groups.has(loc)) {
-        groups.set(loc, []);
+  const sortedTrainers = useMemo(() => {
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    const trainers = [...allTrainers];
+    trainers.sort((a, b) => {
+      const orderDiff = a.battle_order - b.battle_order;
+      if (orderDiff !== 0) {
+        return orderDiff;
       }
-      groups.get(loc)!.push(trainer);
-    }
-    return groups;
+
+      const trainerDiff = collator.compare(a.trainer_name, b.trainer_name);
+      if (trainerDiff !== 0) {
+        return trainerDiff;
+      }
+
+      return collator.compare(a.location || 'Unknown', b.location || 'Unknown');
+    });
+    return trainers;
   }, [allTrainers]);
 
-  // Count important trainers per location
-  const importantCountByLocation = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const [loc, trainers] of locationGroups) {
-      const count = trainers.filter((t) => importantTrainerIds.has(t.id)).length;
-      if (count > 0) {
-        counts.set(loc, count);
-      }
+  const visibleTrainers = useMemo(() => {
+    const scoped =
+      scopeMode === 'important'
+        ? sortedTrainers.filter((trainer) => trainer.is_important)
+        : sortedTrainers;
+
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) {
+      return scoped;
     }
-    return counts;
-  }, [locationGroups, importantTrainerIds]);
 
-  const allLocationKeys = useMemo(() => Array.from(locationGroups.keys()), [locationGroups]);
-  const displayedLocationKeys = allLocationKeys.slice(0, displayedSectionCount);
-  const hasMore = displayedSectionCount < allLocationKeys.length;
+    return scoped.filter((trainer) => trainer.trainer_name.toLowerCase().includes(query));
+  }, [scopeMode, sortedTrainers, searchTerm]);
 
-  const toggleLocation = (location: string) => {
-    setExpandedLocations((prev) => {
-      const next = new Set(prev);
-      if (next.has(location)) {
-        next.delete(location);
-      } else {
-        next.add(location);
-      }
-      return next;
-    });
-  };
+  const displayedTrainers = useMemo(
+    () => visibleTrainers.slice(0, displayedTrainerCount),
+    [visibleTrainers, displayedTrainerCount]
+  );
+  const hasMore = displayedTrainerCount < visibleTrainers.length;
 
   const handleLoadMore = () => {
-    setDisplayedSectionCount((prev) =>
-      Math.min(prev + SECTIONS_PER_PAGE, allLocationKeys.length)
+    setDisplayedTrainerCount((prev) =>
+      Math.min(prev + TRAINERS_PER_PAGE, visibleTrainers.length)
     );
   };
 
-  const isLoading = isLoadingAll || isLoadingImportant;
+  const handleScopeChange = (nextScope: ScopeMode) => {
+    setScopeMode(nextScope);
+    setDisplayedTrainerCount(TRAINERS_PER_PAGE);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setDisplayedTrainerCount(TRAINERS_PER_PAGE);
+  };
+
+  const isLoading = isLoadingAll;
+  const canEvaluateMatchup = !isLoadingParty && gameFileId != null && partyPokemon.length > 0;
 
   return (
     <div
@@ -150,47 +149,113 @@ export const TrainersPage = () => {
           </div>
         </div>
 
+        <div
+          className="card"
+          style={{
+            display: 'flex',
+            gap: '24px',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>Scope</span>
+            <div
+              style={{
+                display: 'inline-flex',
+                gap: '6px',
+                padding: '4px',
+                borderRadius: '999px',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-light)',
+              }}
+            >
+              <button
+                type="button"
+                aria-pressed={scopeMode === 'all'}
+                onClick={() => handleScopeChange('all')}
+                style={{
+                  fontSize: '0.85rem',
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  backgroundColor:
+                    scopeMode === 'all' ? 'var(--color-pokemon-primary)' : 'transparent',
+                  color: scopeMode === 'all' ? 'var(--color-text-white)' : 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                }}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                aria-pressed={scopeMode === 'important'}
+                onClick={() => handleScopeChange('important')}
+                style={{
+                  fontSize: '0.85rem',
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  backgroundColor:
+                    scopeMode === 'important' ? 'var(--color-pokemon-primary)' : 'transparent',
+                  color:
+                    scopeMode === 'important'
+                      ? 'var(--color-text-white)'
+                      : 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                }}
+              >
+                Important
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '240px' }}>
+            <label
+              htmlFor="trainer-search"
+              style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', whiteSpace: 'nowrap' }}
+            >
+              Search
+            </label>
+            <input
+              id="trainer-search"
+              type="text"
+              value={searchTerm}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="Type trainer name..."
+              className="input"
+              style={{ maxWidth: '420px' }}
+            />
+          </div>
+        </div>
+
+        <div
+          className="card"
+          style={{
+            padding: '10px 14px',
+            borderColor: 'var(--color-border)',
+            backgroundColor: 'var(--color-bg-card)',
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: '0.85rem',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            Trainer data is hard to obtain. Information may be missing or inaccurate.
+          </p>
+        </div>
+
         {isLoading ? (
           <p style={{ color: 'var(--color-text-secondary)' }}>Loading trainers...</p>
-        ) : allTrainers.length === 0 ? (
+        ) : visibleTrainers.length === 0 ? (
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            No trainers found for this game.
+            No trainers found for this filter{searchTerm.trim() ? ' and search' : ''}.
           </p>
         ) : (
           <>
-            {/* Key Battles Section */}
-            {importantTrainers.length > 0 && (
-              <div>
-                <h2
-                  style={{
-                    color: 'var(--color-text-primary)',
-                    fontSize: '1.5rem',
-                    margin: 0,
-                    marginBottom: '16px',
-                    fontWeight: 600,
-                  }}
-                >
-                  Key Battles
-                </h2>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
-                  }}
-                >
-                  {importantTrainers.map((trainer) => (
-                    <TrainerCard
-                      key={trainer.id}
-                      trainer={trainer}
-                      highlight={true}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Route-grouped Accordion */}
             <div>
               <h2
                 style={{
@@ -201,117 +266,33 @@ export const TrainersPage = () => {
                   fontWeight: 600,
                 }}
               >
-                All Trainers by Location
+                Trainers
               </h2>
+              <p
+                style={{
+                  color: 'var(--color-text-secondary)',
+                  margin: '0 0 16px 0',
+                  fontSize: '0.95rem',
+                }}
+              >
+                Ordered by battle order.
+              </p>
               <div
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '8px',
+                  gap: '12px',
                 }}
               >
-                {displayedLocationKeys.map((location) => {
-                  const trainers = locationGroups.get(location)!;
-                  const isExpanded = expandedLocations.has(location);
-                  const importantCount = importantCountByLocation.get(location) || 0;
-
-                  return (
-                    <div key={location} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                      {/* Accordion Header */}
-                      <button
-                        type="button"
-                        onClick={() => toggleLocation(location)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          width: '100%',
-                          padding: '16px 20px',
-                          border: 'none',
-                          background: 'none',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          textAlign: 'left',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            flex: 1,
-                            minWidth: 0,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              fontSize: '1rem',
-                              color: 'var(--color-text-primary)',
-                            }}
-                          >
-                            {location}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '0.8rem',
-                              color: 'var(--color-text-secondary)',
-                              flexShrink: 0,
-                            }}
-                          >
-                            ({trainers.length} trainer{trainers.length !== 1 ? 's' : ''})
-                          </span>
-                          {importantCount > 0 && (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 8px',
-                                borderRadius: 'var(--radius-sm, 4px)',
-                                fontSize: '0.7rem',
-                                fontWeight: 600,
-                                color: '#FFFFFF',
-                                backgroundColor: 'var(--color-pokemon-primary, #E74C3C)',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {importantCount} key
-                            </span>
-                          )}
-                        </div>
-                        <span
-                          style={{
-                            fontSize: '1rem',
-                            color: 'var(--color-text-primary)',
-                            flexShrink: 0,
-                            marginLeft: '8px',
-                          }}
-                        >
-                          {isExpanded ? '\u25B2' : '\u25BC'}
-                        </span>
-                      </button>
-
-                      {/* Expanded Content */}
-                      {isExpanded && (
-                        <div
-                          style={{
-                            padding: '0 20px 20px 20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px',
-                          }}
-                        >
-                          {trainers.map((trainer) => (
-                            <TrainerCard
-                              key={trainer.id}
-                              trainer={trainer}
-                              highlight={importantTrainerIds.has(trainer.id)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {displayedTrainers.map((trainer: Trainer) => (
+                  <TrainerCard
+                    key={trainer.id}
+                    trainer={trainer}
+                    highlight={trainer.is_important}
+                    gameFileId={gameFileId}
+                    canEvaluateMatchup={canEvaluateMatchup}
+                  />
+                ))}
               </div>
 
               {/* Load More Button */}
@@ -331,7 +312,7 @@ export const TrainersPage = () => {
                       padding: '10px 24px',
                     }}
                   >
-                    Load more ({allLocationKeys.length - displayedSectionCount} remaining)
+                    Load more ({visibleTrainers.length - displayedTrainerCount} remaining)
                   </button>
                 </div>
               )}

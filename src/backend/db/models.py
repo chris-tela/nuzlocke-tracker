@@ -200,3 +200,16 @@ class Type(Base):
     past_damage_relations = Column(JSON, nullable=True) # from generation_introduction to past_generation ex. (steel: gen 2 - 5 past damage relations, 6 - onwards current relations)
 
 
+class Move(Base):
+    __tablename__ = "move"
+
+    id = Column(Integer, primary_key=True)            # PokeAPI move ID
+    name = Column(String, nullable=False)              # e.g. "swords-dance"
+    type_name = Column(String, nullable=False)         # e.g. "normal", "fire"
+    power = Column(Integer, nullable=True)             # null for status moves
+    pp = Column(Integer, nullable=False)
+    accuracy = Column(Integer, nullable=True)          # null for self-targeting
+    damage_class = Column(String, nullable=False)      # "physical"/"special"/"status"
+    effect = Column(String, nullable=True)             # English short_effect text
+    generation = Column(Integer, nullable=False)       # Gen number (1-9)
+    priority = Column(Integer, nullable=False, default=0)

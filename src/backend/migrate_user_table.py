@@ -15,7 +15,7 @@ def migrate_user_table():
                 ALTER TABLE "user" 
                 ADD COLUMN IF NOT EXISTS hashed_password VARCHAR
             """))
-            print("✓ Added hashed_password column")
+            print("Added hashed_password column")
         except Exception as e:
             print(f"Note: hashed_password column - {e}")
         
@@ -25,7 +25,7 @@ def migrate_user_table():
                 ALTER TABLE "user" 
                 ADD COLUMN IF NOT EXISTS email VARCHAR UNIQUE
             """))
-            print("✓ Added email column")
+            print("Added email column")
         except Exception as e:
             print(f"Note: email column - {e}")
         
@@ -35,7 +35,7 @@ def migrate_user_table():
                 ALTER TABLE "user" 
                 ADD COLUMN IF NOT EXISTS oauth_provider VARCHAR
             """))
-            print("✓ Added oauth_provider column")
+            print("Added oauth_provider column")
         except Exception as e:
             print(f"Note: oauth_provider column - {e}")
         

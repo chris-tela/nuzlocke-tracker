@@ -10,9 +10,18 @@ export interface TrainerPokemonStats {
 export interface TrainerPokemon {
   name: string;
   poke_id: number | null;
+  index?: string | null;
   level: number;
+  types?: string[] | null;
+  ability?: string | null;
+  item?: string | null;
+  nature?: string | null;
+  ivs?: Record<string, number> | null;
+  dvs?: Record<string, number> | null;
+  evs?: Record<string, number> | null;
   moves: string[];
   stats: TrainerPokemonStats | null;
+  [key: string]: unknown;
 }
 
 export interface Trainer {
@@ -28,4 +37,8 @@ export interface Trainer {
   starter_filter: string | null;
   battle_order: number;
   pokemon: TrainerPokemon[];
+}
+
+export interface TrainerMatchupResponse {
+  score_percent: number;
 }

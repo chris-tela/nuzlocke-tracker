@@ -76,6 +76,10 @@ assets_path = os.path.join(backend_dir, "assets")
 if os.path.exists(assets_path):
     app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
 
+data_sprites_path = os.path.join(os.path.dirname(backend_dir), "data", "sprites")
+if os.path.exists(data_sprites_path):
+    app.mount("/data-sprites", StaticFiles(directory=data_sprites_path), name="data-sprites")
+
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])

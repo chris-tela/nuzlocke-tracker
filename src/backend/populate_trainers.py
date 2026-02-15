@@ -11,6 +11,7 @@ Usage:
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -51,6 +52,379 @@ FILE_MAP = {
 # Resolve project paths relative to this script's location.
 BACKEND_DIR = Path(__file__).resolve().parent          # src/backend
 DATA_DIR = BACKEND_DIR.parent / "data"                 # src/data
+SPRITES_DIR = DATA_DIR / "sprites"                     # src/data/sprites
+
+# ---------------------------------------------------------------------------
+# Sprite resolution: map trainer names to sprite image paths
+# ---------------------------------------------------------------------------
+
+# Map FILE_MAP keys to the sprite filename prefix used in src/data/sprites/.
+SPRITE_PREFIX_MAP = {
+    "Gen1/RedBlue.json": "rg",
+    "Gen1/Yellow.json": "y",
+    "Gen2/GS.json": "gs",
+    "Gen2/Crystal.json": "gs",
+    "Gen3/RS.json": "rs",
+    "Gen3/FRLG.json": "frlg",
+    "Gen3/Emerald.json": "rs",
+    "Gen4/DP.json": "dp",
+    "Gen4/Plat.json": "dp",
+    "Gen4/HGSS.json": "hgss",
+    "Gen5/BW.json": "bw",
+    "Gen5/B2W2.json": "b2w2",
+    # Gen 6+ have no sprites yet.
+}
+
+# Per-game aliases for trainer names that don't follow the standard
+# normalisation rules.  Keys are (sprite_prefix, normalised_name).
+_SPRITE_ALIASES: dict[tuple[str, str], str] = {
+    # Gen 1 Red/Blue
+    ("rg", "rival"):        "blue_1",
+    ("rg", "rival_champ"):  "blue_1",
+    ("rg", "surge"):        "lt_surge",
+    ("rg", "pokemaniac"):   "pok_maniac",
+    ("rg", "cooltrainer"):  "cooltrainer_m",
+    ("rg", "jr_trainer"):   "jr_trainer_m",
+    ("rg", "jr_traimer"):   "jr_trainer_m",
+    ("rg", "swimmer"):      "swimmer_m",
+    ("rg", "black_belt"):   "blackbelt",
+    # Gen 1 Yellow
+    ("y", "rival"):         "blue_1",
+    ("y", "rival_champ"):   "blue_1",
+    ("y", "surge"):         "lt_surge",
+    ("y", "pokemaniac"):    "pok_maniac",
+    ("y", "cooltrainer"):   "cooltrainer_m",
+    ("y", "jr_trainer"):    "jr_trainer_m",
+    ("y", "jr_traimer"):    "jr_trainer_m",
+    ("y", "swimmer"):       "swimmer_m",
+    ("y", "black_belt"):    "blackbelt",
+    # Gen 2 GS / Crystal
+    ("gs", "rival"):        "silver_1",
+    ("gs", "pkmn_trainer_red"): "red",
+    ("gs", "pokefan"):      "pok_fan_m",
+    ("gs", "pokéfan"):      "pok_fan_m",
+    ("gs", "pokemaniac"):   "pok_maniac",
+    ("gs", "cooltrainer"):  "cooltrainer_m",
+    ("gs", "cool_trainer"):  "cooltrainer_m",
+    ("gs", "swimmer"):      "swimmer_m",
+    ("gs", "swimmer_f"):    "swimmer_m",
+    ("gs", "schoolboy"):    "school_kid_m",
+    ("gs", "school_kid"):   "school_kid_m",
+    ("gs", "rocket_grunt"): "rocket_grunt_m",
+    ("gs", "grunt"):        "rocket_grunt_m",
+    ("gs", "blackbelt"):    "black_belt",
+    ("gs", "fire_breather"): "firebreather",
+    ("gs", "firebreather"): "firebreather",
+    ("gs", "burgular"):     "burglar",
+    ("gs", "border"):       "boarder",
+    ("gs", "birdkeeper"):   "bird_keeper",
+    ("gs", "picknicker"):   "picnicker",
+    ("gs", "surge"):        "lt_surge",
+    ("gs", "poke_maniac"):  "pok_maniac",
+    ("gs", "pshycic"):      "psychic",
+    ("gs", "rocket_exec"):  "rocket_grunt_m",
+    ("gs", "twins"):        "twins",
+    ("gs", "fisher"):       "fisherman",
+    ("gs", "amy"):          "twins",
+    ("gs", "jo"):           "twins",
+    ("gs", "meg"):          "twins",
+    # Gen 3 RS / Emerald
+    ("rs", "rival"):        "wally",
+    ("rs", "aqua_grunt"):   "team_aqua_grunt_m",
+    ("rs", "magma_grunt"):  "team_magma_grunt_m",
+    ("rs", "aqua_admin"):   "team_aqua_grunt_m",
+    ("rs", "magma_admin"):  "team_magma_grunt_m",
+    ("rs", "grunt"):        "team_aqua_grunt_m",
+    ("rs", "grunt_weather_ins"): "team_magma_grunt_m",
+    ("rs", "cooltrainer"):  "cooltrainer_m",
+    ("rs", "swimmer"):      "swimmer_m",
+    ("rs", "pokefan"):      "pok_fan_m",
+    ("rs", "pokéfan"):      "pok_fan_m",
+    ("rs", "pokemaniac"):   "pok_maniac",
+    ("rs", "tate&liza"):    "tate_and_liza",
+    ("rs", "pokemon_breeder"): "pok_mon_breeder_m",
+    ("rs", "pokémon_breeder"): "pok_mon_breeder_m",
+    ("rs", "pokemon_ranger"): "pok_mon_ranger_m",
+    ("rs", "pokémon_ranger"): "pok_mon_ranger_m",
+    ("rs", "pkmn_trainer"): "wally",
+    ("rs", "gentlman"):     "gentleman",
+    ("rs", "batle_girl"):   "battle_girl",
+    ("rs", "old_couple"):   "old_couple",
+    ("rs", "sr_and_jr"):    "sr_and_jr",
+    ("rs", "interviewer"):  "interviewer",
+    ("rs", "pokémaniac"):   "pok_maniac",
+    ("rs", "swimmer_f"):    "swimmer_m",
+    ("rs", "picknicker"):   "picnicker",
+    ("rs", "gatekeeper"):   "gentleman",
+    ("rs", "triathlete"):   "triathlete_runner_m",
+    ("rs", "traithlete"):   "triathlete_runner_m",
+    ("rs", "trialthete"):   "triathlete_runner_m",
+    ("rs", "winstrate"):    "lady",
+    ("rs", "team_magma_straggler"): "team_magma_grunt_m",
+    ("rs", "youg_couple"):  "young_couple",
+    ("rs", "sis_&_bro"):    "sis_and_bro",
+    ("rs", "sr_&_jr"):      "sr_and_jr",
+    # Gen 3 FRLG
+    ("frlg", "rival"):       "cooltrainer_m",
+    ("frlg", "rival_champ"): "cooltrainer_m",
+    ("frlg", "surge"):       "lt_surge",
+    ("frlg", "pokemaniac"):  "pok_maniac",
+    ("frlg", "cooltrainer"): "cooltrainer_m",
+    ("frlg", "cool_couple"): "cool_couple",
+    ("frlg", "crush_kin"):   "crush_kin",
+    ("frlg", "swimmer"):     "swimmer_m",
+    ("frlg", "rocket_grunt"): "team_rocket_grunt_m",
+    ("frlg", "grunt"):       "team_rocket_grunt_m",
+    ("frlg", "gentlman"):    "gentleman",
+    ("frlg", "pokefan"):     "pok_fan_m",
+    ("frlg", "pokéfan"):     "pok_fan_m",
+    ("frlg", "sis_and_bro"): "sis_and_bro",
+    ("frlg", "picknicker"):  "picnicker",
+    ("frlg", "swimmer_f"):   "swimmer_m",
+    ("frlg", "saillor"):    "sailor",
+    # Gen 4 DP / Plat
+    ("dp", "rival"):        "barry",
+    ("dp", "wake"):         "crasher_wake",
+    ("dp", "surge"):        "lt_surge",
+    ("dp", "cooltrainer"):  "ace_trainer_m",
+    ("dp", "swimmer"):      "swimmer_m",
+    ("dp", "grunt"):        "galactic_grunt_m",
+    ("dp", "pokefan"):      "pok_fan_m",
+    ("dp", "pokéfan"):      "pok_fan_m",
+    ("dp", "poke_kid"):     "pok__kid",
+    ("dp", "pokemon_breeder"): "pok_mon_breeder_m",
+    ("dp", "pokemon_ranger"): "pok_mon_ranger_m",
+    ("dp", "pokémon_breeder"): "pok_mon_breeder_m",
+    ("dp", "pokémon_ranger"): "pok_mon_ranger_m",
+    ("dp", "pokemon_trainer"): "ace_trainer_m",
+    ("dp", "breeder"):      "pok_mon_breeder_m",
+    ("dp", "mars_&_jupiter"): "mars",
+    ("dp", "double_team"):  "double_team",
+    ("dp", "belle_&_pa"):   "double_team",
+    ("dp", "fisherma"):     "fisherman",
+    ("dp", "picknicker"):   "picnicker",
+    ("dp", "swimmer_f"):    "swimmer_m",
+    ("dp", "policeman"):    "officer",
+    ("dp", "cyclist"):      "cyclist_m",
+    ("dp", "al"):           "double_team",
+    ("dp", "ava"):          "young_couple",
+    ("dp", "beth"):         "young_couple",
+    ("dp", "emma"):         "young_couple",
+    ("dp", "jo"):           "twins",
+    ("dp", "mike"):         "young_couple",
+    ("dp", "teri"):         "twins",
+    ("dp", "ranger"):       "pok_mon_ranger_m",
+    ("dp", "rancho"):       "rancher",
+    ("dp", "sceintist"):    "scientist",
+    # Gen 4 HGSS
+    ("hgss", "rival"):       "silver",
+    ("hgss", "pkmn_trainer_red"): "red",
+    ("hgss", "surge"):       "lt_surge",
+    ("hgss", "pokemaniac"):  "pok_maniac",
+    ("hgss", "pokefan"):     "pok_fan_m",
+    ("hgss", "pokéfan"):     "pok_fan_m",
+    ("hgss", "cooltrainer"): "ace_trainer_m",
+    ("hgss", "cool_trainer"): "ace_trainer_m",
+    ("hgss", "swimmer"):     "swimmer_m",
+    ("hgss", "rocket_grunt"): "rocket_grunt_m",
+    ("hgss", "grunt"):       "rocket_grunt_m",
+    ("hgss", "schoolboy"):   "school_kid_m",
+    ("hgss", "school_kid"):  "school_kid_m",
+    ("hgss", "blackbelt"):   "black_belt",
+    ("hgss", "fire_breather"): "firebreather",
+    ("hgss", "firebreather"): "firebreather",
+    ("hgss", "burgular"):    "burglar",
+    ("hgss", "border"):      "boarder",
+    ("hgss", "birdkeeper"):  "bird_keeper",
+    ("hgss", "archer"):      "rocket_grunt_m",
+    ("hgss", "ariana"):      "rocket_grunt_m",
+    ("hgss", "proton"):      "rocket_grunt_m",
+    ("hgss", "petrel"):      "petrel",
+    ("hgss", "picknicker"):  "picnicker",
+    ("hgss", "amy"):         "twins",
+    ("hgss", "clea"):        "twins",
+    ("hgss", "day"):         "twins",
+    ("hgss", "duff"):        "twins",
+    ("hgss", "elan"):        "twins",
+    ("hgss", "jo"):          "twins",
+    ("hgss", "meg"):         "twins",
+    ("hgss", "kay"):         "twins",
+    ("hgss", "moe"):         "twins",
+    ("hgss", "poke_maniac"): "pok_maniac",
+    ("hgss", "pshycic"):    "psychic",
+    ("hgss", "schhool_kid"): "school_kid_m",
+    ("hgss", "pokemon_trainer"): "ace_trainer_m",
+    ("hgss", "policeman"):  "officer",
+    ("hgss", "swimmer_f"):   "swimmer_m",
+    ("hgss", "fisher"):      "fisherman",
+    ("hgss", "twins"):       "twins",
+    ("hgss", "elder"):       "sage",
+    ("hgss", "proton"):      "rocket_grunt_m",
+    ("hgss", "surge"):       "lt_surge",
+    # Gen 5 BW
+    ("bw", "rival"):        "cheren",
+    ("bw", "grunt"):        "plasma_grunt_m",
+    ("bw", "pokéfan"):      "pok_fan_m",
+    ("bw", "pokefan"):      "pok_fan_m",
+    ("bw", "pokémon_breeder"): "pok_mon_breeder_m",
+    ("bw", "pokémon_ranger"): "pok_mon_ranger_m",
+    ("bw", "pokemon_breeder"): "pok_mon_breeder_m",
+    ("bw", "pokemon_ranger"): "pok_mon_ranger_m",
+    ("bw", "swimmer"):      "swimmer_m",
+    ("bw", "swimmer_f"):    "swimmer_m",
+    ("bw", "clerk"):        "clerk_m",
+    ("bw", "backpacker"):   "backpacker_m",
+    ("bw", "school_kid"):   "school_kid_m",
+    ("bw", "cyclist"):      "cyclist_m",
+    ("bw", "pok_fan"):      "pok_fan_m",
+    ("bw", "breeder"):      "pok_mon_breeder_m",
+    ("bw", "picknicker"):   "picnicker",
+    ("bw", "cheren"):       "ace_trainer_m",
+    ("bw", "houghneck"):    "roughneck",
+    ("bw", "ranger"):       "pok_mon_ranger_m",
+    ("bw", "psychic"):      "psychic",
+    # Gen 5 B2W2
+    ("b2w2", "rival"):       "hugh",
+    ("b2w2", "grunt"):       "plasma_grunt_m",
+    ("b2w2", "plasma_shadow"): "plasma_grunt_m",
+    ("b2w2", "plasma_double"): "plasma_grunt_m",
+    ("b2w2", "pokéfan"):     "pok_fan_m",
+    ("b2w2", "pokefan"):     "pok_fan_m",
+    ("b2w2", "pokémon_breeder"): "pok_mon_breeder_m",
+    ("b2w2", "pokémon_ranger"): "pok_mon_ranger_m",
+    ("b2w2", "pokemon_breeder"): "pok_mon_breeder_m",
+    ("b2w2", "pokemon_ranger"): "pok_mon_ranger_m",
+    ("b2w2", "swimmer"):     "swimmer_m",
+    ("b2w2", "swimmer_f"):  "swimmer_m",
+    ("b2w2", "clerk"):      "clerk_m",
+    ("b2w2", "backpacker"): "backpacker_m",
+    ("b2w2", "school_kid"): "school_kid_m",
+    ("b2w2", "cyclist"):    "cyclist_m",
+    ("b2w2", "pok_fan"):    "pok_fan_m",
+    ("b2w2", "breeder"):    "pok_mon_breeder_m",
+    ("b2w2", "picknicker"):  "picnicker",
+    ("b2w2", "ranger"):      "pok_mon_ranger_m",
+    ("b2w2", "pkmn_ranger"): "pok_mon_ranger_m",
+    ("b2w2", "policeman"):   "officer",
+    ("b2w2", "preeschooler"): "preschooler_m",
+    ("b2w2", "parsol_lady"): "parasol_lady",
+    ("b2w2", "motorcyclist"): "biker",
+    ("b2w2", "gf"):          "gentleman",
+    ("b2w2", "ghetsis"):     "plasma_grunt_m",
+    ("b2w2", "guitarist"):   "guitarist",
+    ("b2w2", "dancer"):      "dancer",
+    ("b2w2", "ava"):         "twins",
+    ("b2w2", "claude"):      "twins",
+    ("b2w2", "rob"):         "twins",
+    ("b2w2", "sola"):        "twins",
+    ("b2w2", "stu"):         "twins",
+}
+
+
+def _build_available_sprites() -> set[str]:
+    """Return a set of all sprite filenames (e.g. 'rg_brock.webp')."""
+    if not SPRITES_DIR.exists():
+        return set()
+    return {f.name for f in SPRITES_DIR.iterdir() if f.suffix == ".webp"}
+
+
+def _normalize_name(name: str) -> str:
+    """Lowercase, strip trailing numbers/direction suffixes, normalise to underscore."""
+    # Strip trailing number (e.g. "Bug Catcher 1" → "Bug Catcher")
+    name = re.sub(r"\s+\d+$", "", name.strip())
+    # Strip trailing "Double" suffix (e.g. "Grunt Double" → "Grunt")
+    name = re.sub(r"\s+Double$", "", name)
+    # Strip trailing (Double) suffix (e.g. "Ace Trainer Cora (Double)")
+    name = re.sub(r"\s*\(Double\)$", "", name)
+    # Strip trailing directional suffixes (e.g. "Channeler NW" → "Channeler")
+    name = re.sub(r"\s+(?:N|S|E|W|NE|NW|SE|SW)$", "", name)
+    # Strip "Space Tag" suffix (Emerald-specific)
+    name = re.sub(r"\s+Space Tag$", "", name)
+    # Strip gender symbols
+    name = name.replace("\u2640", "").replace("\u2642", "").strip()
+    # Lowercase, replace spaces/periods/dashes with underscore
+    name = name.lower().replace(" ", "_").replace(".", "").replace("-", "_")
+    # Collapse double underscores from stripping
+    name = re.sub(r"_+", "_", name).strip("_")
+    return name
+
+
+def _resolve_trainer_sprite(
+    trainer_name: str,
+    sprite_prefix: str,
+    available: set[str],
+) -> str:
+    """
+    Return the sprite path (relative to src/) for a trainer, or "" if none found.
+
+    Tries multiple strategies in order:
+    1. Full normalised name
+    2. Full normalised name + _m (male variant)
+    3. Last word only (handles "Leader Bugsy" → bugsy, "Elite Four Will" → will)
+    4. All words except last (handles "Ace Trainer Allen" → ace_trainer)
+    5. All words except last + _m
+    6. Alias map
+    """
+    # For pair trainers like "Ace Trainer Jenn & Irene", use only the left half.
+    if " & " in trainer_name:
+        trainer_name = trainer_name.split(" & ")[0]
+    elif " and " in trainer_name.lower():
+        # Handle "Old Couple John and Jay" → "Old Couple John"
+        trainer_name = re.split(r"\s+and\s+", trainer_name, flags=re.IGNORECASE)[0]
+
+    norm = _normalize_name(trainer_name)
+
+    # Check alias map first (highest priority for known edge cases).
+    alias = _SPRITE_ALIASES.get((sprite_prefix, norm))
+    if alias:
+        candidate = f"{sprite_prefix}_{alias}.webp"
+        if candidate in available:
+            return f"data/sprites/{candidate}"
+
+    # Strategy 1: exact normalised name.
+    candidate = f"{sprite_prefix}_{norm}.webp"
+    if candidate in available:
+        return f"data/sprites/{candidate}"
+
+    # Strategy 2: with _m suffix.
+    candidate = f"{sprite_prefix}_{norm}_m.webp"
+    if candidate in available:
+        return f"data/sprites/{candidate}"
+
+    # For multi-word names, try splitting.
+    parts = norm.split("_")
+    if len(parts) >= 2:
+        # Strategy 3: last word only (for "Leader Bugsy" → "bugsy").
+        last = parts[-1]
+        # Check alias for just the last word too.
+        alias = _SPRITE_ALIASES.get((sprite_prefix, last))
+        if alias:
+            candidate = f"{sprite_prefix}_{alias}.webp"
+            if candidate in available:
+                return f"data/sprites/{candidate}"
+
+        candidate = f"{sprite_prefix}_{last}.webp"
+        if candidate in available:
+            return f"data/sprites/{candidate}"
+
+        # Strategy 4: everything except last word (for "Ace Trainer Allen" → "ace_trainer").
+        class_name = "_".join(parts[:-1])
+        alias = _SPRITE_ALIASES.get((sprite_prefix, class_name))
+        if alias:
+            candidate = f"{sprite_prefix}_{alias}.webp"
+            if candidate in available:
+                return f"data/sprites/{candidate}"
+
+        candidate = f"{sprite_prefix}_{class_name}.webp"
+        if candidate in available:
+            return f"data/sprites/{candidate}"
+
+        # Strategy 5: class name + _m.
+        candidate = f"{sprite_prefix}_{class_name}_m.webp"
+        if candidate in available:
+            return f"data/sprites/{candidate}"
+
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -152,9 +526,6 @@ def _get_gym_leader_names(db: Session, game_names: list[str]) -> set[str]:
     return {g.trainer_name.lower() for g in gyms if g.trainer_name}
 
 
-# ---------------------------------------------------------------------------
-# Stat computation for a single trainer pokemon
-# ---------------------------------------------------------------------------
 
 def _compute_pokemon_stats(
     poke_entry: dict,
@@ -170,14 +541,26 @@ def _compute_pokemon_stats(
     level = poke_entry["level"]
     base = pokemon_map.get(name.lower())
 
+    extra_fields = {
+        "index": poke_entry.get("index"),
+        "ability": poke_entry.get("ability"),
+        "item": poke_entry.get("item"),
+        "nature": poke_entry.get("nature"),
+        "ivs": poke_entry.get("ivs"),
+        "dvs": poke_entry.get("dvs"),
+        "evs": poke_entry.get("evs"),
+    }
+
     if base is None:
         print(f"  [WARN] Pokemon '{name}' not found in AllPokemon table — skipping stat calc")
         return {
             "name": name,
             "poke_id": None,
             "level": level,
+            "types": poke_entry.get("types", []),
             "moves": poke_entry.get("moves", []),
             "stats": None,
+            **extra_fields,
         }
 
     # Get the raw DV/IV dict from whichever key is present.
@@ -208,8 +591,10 @@ def _compute_pokemon_stats(
         "name": name,
         "poke_id": base.poke_id,
         "level": level,
+        "types": base.types or [],
         "moves": poke_entry.get("moves", []),
         "stats": stats,
+        **extra_fields,
     }
 
 
@@ -227,6 +612,8 @@ def populate(db: Session) -> None:
     print(f"Cleared {deleted} existing Trainer rows.")
 
     global_battle_order = 0  # running counter across *all* files
+    available_sprites = _build_available_sprites()
+    print(f"Found {len(available_sprites)} sprite files on disk.")
 
     for rel_path, (game_names, generation) in FILE_MAP.items():
         json_path = DATA_DIR / rel_path
@@ -242,6 +629,9 @@ def populate(db: Session) -> None:
         # Determine whether this gen uses DVs (Gen 1-2) or IVs (Gen 3+).
         is_dv = generation <= 2
 
+        # Look up sprite prefix for this file (empty for Gen 6+).
+        sprite_prefix = SPRITE_PREFIX_MAP.get(rel_path, "")
+
         # Fetch route candidates and gym leader names for this set of games.
         version_ids = _get_version_ids(db, game_names)
         route_candidates = _get_route_candidates(db, version_ids)
@@ -251,6 +641,8 @@ def populate(db: Session) -> None:
 
         # Phase 1: Build trainer records.
         trainer_records: list[dict] = []
+        sprite_hits = 0
+        sprite_misses = 0
 
         for entry in entries:
             global_battle_order += 1
@@ -258,7 +650,17 @@ def populate(db: Session) -> None:
             trainer_name = entry.get("trainer", "Unknown")
             location = entry.get("location") or ""
             starter = entry.get("starter")  # may be None
-            sprite = entry.get("sprite") or ""
+
+            # Resolve sprite from trainer name + game prefix.
+            if sprite_prefix:
+                sprite = _resolve_trainer_sprite(trainer_name, sprite_prefix, available_sprites)
+                if sprite:
+                    sprite_hits += 1
+                else:
+                    sprite_misses += 1
+                    print(f"  [MISS] No sprite for: {trainer_name}")
+            else:
+                sprite = ""
 
             # Compute pokemon entries with true stats.
             pokemon_out: list[dict] = []
@@ -279,7 +681,8 @@ def populate(db: Session) -> None:
 
             # Classify importance.
             importance_reason, is_important = classify_importance(
-                trainer_name, location, gym_leader_names
+                trainer_name, location, gym_leader_names,
+                game_names=tuple(game_names),
             )
 
             trainer_records.append({
@@ -296,6 +699,11 @@ def populate(db: Session) -> None:
                 "pokemon": pokemon_out,
                 "avg_level": avg_level,
             })
+
+        if sprite_prefix:
+            total = sprite_hits + sprite_misses
+            pct = (sprite_hits / total * 100) if total else 0
+            print(f"  Sprites: {sprite_hits}/{total} matched ({pct:.0f}%)")
 
         # Phase 2: Detect level outliers among non-important trainers.
         non_important = [
@@ -335,9 +743,6 @@ def populate(db: Session) -> None:
     print("\nDone.")
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     db = SessionLocal()

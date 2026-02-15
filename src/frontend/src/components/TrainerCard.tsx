@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Trainer, TrainerPokemon, TrainerPokemonStats } from '../types/trainer';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
+import { resolvePokemonSpriteUrl, resolveTrainerSpriteUrl } from '../utils/spriteResolvers';
+import { PokemonTypeBadge } from './PokemonTypeBadge';
+import { getTrainerMatchupSynergy } from '../services/trainerService';
 const STAT_MAX = 255;
 
 const IMPORTANCE_BADGES: Record<string, { color: string; label: string }> = {
@@ -11,7 +11,7 @@ const IMPORTANCE_BADGES: Record<string, { color: string; label: string }> = {
   elite_four: { color: '#9B59B6', label: 'Elite Four' },
   champion: { color: '#F39C12', label: 'Champion' },
   evil_team_leader: { color: '#2C3E50', label: 'Evil Team' },
-  level_outlier: { color: '#E67E22', label: 'Tough Battle' },
+  level_outlier: { color: '#E67E22', label: 'Level Spike' },
 };
 
 const STAT_LABELS: { key: keyof TrainerPokemonStats; label: string }[] = [
@@ -23,85 +23,139 @@ const STAT_LABELS: { key: keyof TrainerPokemonStats; label: string }[] = [
   { key: 'speed', label: 'Spe' },
 ];
 
-function getStatBarColor(value: number): string {
-  if (value >= 100) return '#22C55E';
-  if (value >= 60) return '#3B82F6';
-  if (value >= 30) return '#FBBF24';
-  return '#F87171';
-}
+const KNOWN_POKEMON_FIELDS = new Set([
+  'name',
+  'poke_id',
+  'index',
+  'types',
+  'level',
+  'ability',
+  'item',
+  'nature',
+  'moves',
+  'stats',
+  'ivs',
+  'dvs',
+  'evs',
+]);
 
 interface TrainerCardProps {
   trainer: Trainer;
   highlight?: boolean;
+  gameFileId?: number | null;
+  canEvaluateMatchup?: boolean;
 }
 
-export function TrainerCard({ trainer, highlight }: TrainerCardProps) {
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+function getStatBarColor(value: number): string {
+  if (value >= 140) return '#22C55E';
+  if (value >= 100) return '#84CC16';
+  if (value >= 70) return '#FACC15';
+  if (value >= 40) return '#F59E0B';
+  return '#EF4444';
+}
 
-  const badge = trainer.importance_reason
-    ? IMPORTANCE_BADGES[trainer.importance_reason]
-    : null;
+function formatLabel(raw: string): string {
+  return raw
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
 
-  const handlePokemonClick = (index: number) => {
-    setExpandedIndex((prev) => (prev === index ? null : index));
+function formatValue(value: unknown): string {
+  if (value == null) return 'N/A';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+export function TrainerCard({
+  trainer,
+  highlight,
+  gameFileId = null,
+  canEvaluateMatchup = false,
+}: TrainerCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [matchupScore, setMatchupScore] = useState<number | null>(null);
+  const [isLoadingMatchup, setIsLoadingMatchup] = useState(false);
+  const [matchupError, setMatchupError] = useState<string | null>(null);
+  const badge = trainer.importance_reason ? IMPORTANCE_BADGES[trainer.importance_reason] : null;
+  const trainerSpriteUrl = resolveTrainerSpriteUrl(trainer.trainer_image);
+
+  const metaRows = useMemo(
+    () => [
+      { label: 'Generation', value: trainer.generation },
+      { label: 'Starter Filter', value: trainer.starter_filter ?? 'N/A' },
+      { label: 'Important', value: trainer.is_important ? 'Yes' : 'No' },
+      { label: 'Game(s)', value: trainer.game_names.join(', ') },
+    ],
+    [trainer]
+  );
+
+  const handleMatchupClick = async () => {
+    if (gameFileId == null || !canEvaluateMatchup || isLoadingMatchup) return;
+
+    setIsLoadingMatchup(true);
+    setMatchupError(null);
+    try {
+      const response = await getTrainerMatchupSynergy(trainer.id, gameFileId);
+      setMatchupScore(response.score_percent);
+    } catch {
+      setMatchupError('Could not calculate matchup right now.');
+    } finally {
+      setIsLoadingMatchup(false);
+    }
   };
 
   return (
     <div
       style={{
-        backgroundColor: 'var(--color-bg-card)',
-        border: highlight ? '3px solid var(--color-pokemon-primary)' : '2px solid var(--color-border)',
+        backgroundColor: '#111827',
+        border: highlight ? '2px solid #6366F1' : '2px solid #374151',
         borderRadius: 'var(--radius-lg)',
-        padding: 'var(--spacing-md)',
-        boxShadow: highlight ? 'var(--shadow-lg)' : 'var(--shadow-md)',
-        transition: 'all 300ms ease',
+        boxShadow: highlight ? '0 10px 24px rgba(79,70,229,0.35)' : '0 8px 20px rgba(0,0,0,0.2)',
+        overflow: 'hidden',
       }}
     >
-      {/* Header */}
-      <div
+      <button
+        type="button"
+        onClick={() => setIsExpanded((prev) => !prev)}
+        aria-expanded={isExpanded}
         style={{
+          width: '100%',
+          padding: '14px 16px',
+          border: 'none',
+          background: 'transparent',
+          textAlign: 'left',
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--spacing-sm)',
-          marginBottom: 'var(--spacing-md)',
+          gap: '12px',
+          cursor: 'pointer',
         }}
       >
-        {trainer.trainer_image && (
-          <img
-            src={trainer.trainer_image}
-            alt={trainer.trainer_name}
-            style={{
-              width: 48,
-              height: 48,
-              imageRendering: 'pixelated',
-              objectFit: 'contain',
-            }}
-          />
-        )}
+        <SpriteFrame
+          src={trainerSpriteUrl}
+          alt={trainer.trainer_name}
+          width={56}
+          height={56}
+          fallbackLabel="?"
+          rounded
+        />
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', flexWrap: 'wrap' }}>
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: '1rem',
-                color: 'var(--color-text-primary)',
-              }}
-            >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '1rem', fontWeight: 700, color: '#F9FAFB' }}>
               {trainer.trainer_name}
             </span>
-
             {badge && (
               <span
                 style={{
-                  display: 'inline-block',
                   padding: '2px 8px',
                   borderRadius: 'var(--radius-sm)',
                   fontSize: '0.7rem',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  color: '#FFFFFF',
+                  letterSpacing: '0.4px',
+                  color: '#FFF',
                   backgroundColor: badge.color,
                 }}
               >
@@ -109,271 +163,406 @@ export function TrainerCard({ trainer, highlight }: TrainerCardProps) {
               </span>
             )}
           </div>
+          <div style={{ fontSize: '0.85rem', color: '#CBD5E1' }}>
+            {trainer.location || 'Unknown location'}
+          </div>
+          {trainer.importance_reason && (
+            <div style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: 2 }}>
+              Reason: {formatLabel(trainer.importance_reason)}
+            </div>
+          )}
+        </div>
 
+        <span style={{ color: '#94A3B8', fontWeight: 700 }}>
+          {isExpanded ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {isExpanded && (
+        <div
+          style={{
+            borderTop: '1px solid #334155',
+            padding: '14px 16px 16px 16px',
+            background:
+              'radial-gradient(circle at top left, rgba(79,70,229,0.18), rgba(17,24,39,1) 55%)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+          }}
+        >
           <div
             style={{
-              fontSize: '0.8rem',
-              color: 'var(--color-text-secondary)',
-              marginTop: 2,
+              border: '1px solid #334155',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'rgba(15,23,42,0.85)',
+              padding: '10px 12px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: '8px 12px',
             }}
           >
-            {trainer.location}
+            {metaRows.map((row) => (
+              <div key={row.label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 700 }}>
+                  {row.label}
+                </span>
+                <span style={{ fontSize: '0.82rem', color: '#F8FAFC' }}>
+                  {String(row.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {trainer.pokemon.map((pokemon, index) => (
+              <PokemonBattlePanel key={`${pokemon.name}-${index}`} pokemon={pokemon} />
+            ))}
+          </div>
+
+          <div style={{ marginTop: 6, borderTop: '1px solid #334155', paddingTop: 10 }}>
+            <button
+              type="button"
+              className={canEvaluateMatchup ? 'btn btn-outline' : 'btn'}
+              onClick={handleMatchupClick}
+              disabled={!canEvaluateMatchup || isLoadingMatchup}
+              style={{
+                width: '100%',
+                fontSize: '0.8rem',
+                padding: '8px 12px',
+                borderColor: '#60A5FA',
+                color: canEvaluateMatchup ? '#60A5FA' : '#64748B',
+              }}
+            >
+              {isLoadingMatchup ? 'CALCULATING...' : 'SEE MATCHUP SYNERGY'}
+            </button>
+
+            {!canEvaluateMatchup && (
+              <div style={{ marginTop: 6, fontSize: '0.72rem', color: '#94A3B8' }}>
+                Add PARTY Pokemon to evaluate synergy.
+              </div>
+            )}
+
+            {matchupError && (
+              <div style={{ marginTop: 6, fontSize: '0.75rem', color: '#FCA5A5' }}>{matchupError}</div>
+            )}
+
+            {matchupScore != null && !matchupError && (
+              <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#E2E8F0' }}>
+                Matchup score: <strong style={{ color: '#F8FAFC' }}>{matchupScore}%</strong>
+              </div>
+            )}
           </div>
         </div>
-      </div>
-
-      {/* Pokemon Lineup */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 'var(--spacing-sm)',
-          overflowX: 'auto',
-          paddingBottom: 'var(--spacing-xs)',
-        }}
-      >
-        {trainer.pokemon.map((poke, index) => (
-          <PokemonSlot
-            key={`${poke.name}-${index}`}
-            pokemon={poke}
-            isExpanded={expandedIndex === index}
-            onClick={() => handlePokemonClick(index)}
-          />
-        ))}
-      </div>
-
-      {/* Expanded Pokemon Detail */}
-      {expandedIndex !== null && trainer.pokemon[expandedIndex] && (
-        <PokemonDetail pokemon={trainer.pokemon[expandedIndex]} />
       )}
     </div>
   );
 }
 
-function PokemonSlot({
-  pokemon,
-  isExpanded,
-  onClick,
-}: {
-  pokemon: TrainerPokemon;
-  isExpanded: boolean;
-  onClick: () => void;
-}) {
-  const spriteUrl = pokemon.poke_id
-    ? `${API_BASE_URL}/assets/sprites/${pokemon.poke_id}.webp`
-    : undefined;
+function PokemonBattlePanel({ pokemon }: { pokemon: TrainerPokemon }) {
+  const spriteUrl = resolvePokemonSpriteUrl(pokemon.name, pokemon.poke_id);
+  const extraFields = Object.entries(pokemon).filter(([key, value]) => {
+    if (KNOWN_POKEMON_FIELDS.has(key)) return false;
+    if (value == null) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+  });
 
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 2,
-        padding: 'var(--spacing-xs)',
-        border: isExpanded
-          ? '2px solid var(--color-pokemon-primary)'
-          : '2px solid transparent',
-        borderRadius: 'var(--radius-md)',
-        backgroundColor: isExpanded ? 'var(--color-bg-light)' : 'transparent',
-        cursor: 'pointer',
-        minWidth: 64,
-        transition: 'all 150ms ease',
-        outline: 'none',
-        fontFamily: 'inherit',
-      }}
-      title={`${pokemon.name} Lv.${pokemon.level}`}
-    >
-      {spriteUrl ? (
-        <img
-          src={spriteUrl}
-          alt={pokemon.name}
-          style={{
-            width: 40,
-            height: 40,
-            imageRendering: 'pixelated',
-            objectFit: 'contain',
-          }}
-        />
-      ) : (
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            backgroundColor: 'var(--color-border)',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '0.6rem',
-            color: 'var(--color-text-secondary)',
-          }}
-        >
-          ?
-        </div>
-      )}
-
-      <span
-        style={{
-          fontSize: '0.7rem',
-          fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: 64,
-        }}
-      >
-        {pokemon.name}
-      </span>
-
-      <span
-        style={{
-          fontSize: '0.6rem',
-          color: 'var(--color-text-secondary)',
-        }}
-      >
-        Lv.{pokemon.level}
-      </span>
-    </button>
-  );
-}
-
-function PokemonDetail({ pokemon }: { pokemon: TrainerPokemon }) {
   return (
     <div
       style={{
-        marginTop: 'var(--spacing-sm)',
-        padding: 'var(--spacing-md)',
-        backgroundColor: 'var(--color-bg-light)',
+        border: '1px solid #374151',
         borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--color-border)',
+        backgroundColor: 'rgba(3,7,18,0.88)',
+        padding: '12px',
       }}
     >
-      {/* Stat Bars */}
-      {pokemon.stats && (
-        <div style={{ marginBottom: pokemon.moves.length > 0 ? 'var(--spacing-md)' : 0 }}>
-          <div
-            style={{
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              marginBottom: 'var(--spacing-xs)',
-            }}
-          >
-            Base Stats
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {STAT_LABELS.map(({ key, label }) => {
-              const value = pokemon.stats![key];
-              const barWidth = Math.min((value / STAT_MAX) * 100, 100);
-              const barColor = getStatBarColor(value);
-
-              return (
-                <div
-                  key={key}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--spacing-sm)',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 28,
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      color: 'var(--color-text-secondary)',
-                      textAlign: 'right',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {label}
-                  </span>
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 10,
-                      backgroundColor: 'var(--color-border)',
-                      borderRadius: 'var(--radius-sm)',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${barWidth}%`,
-                        height: '100%',
-                        backgroundColor: barColor,
-                        borderRadius: 'var(--radius-sm)',
-                        transition: 'width 300ms ease',
-                      }}
-                    />
-                  </div>
-                  <span
-                    style={{
-                      width: 28,
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      color: 'var(--color-text-primary)',
-                      textAlign: 'right',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {value}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Moves */}
-      {pokemon.moves.length > 0 && (
-        <div>
-          <div
-            style={{
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              marginBottom: 'var(--spacing-xs)',
-            }}
-          >
-            Moves
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 'var(--spacing-xs)',
-            }}
-          >
-            {pokemon.moves.map((move) => (
-              <span
-                key={move}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: '12px',
+          alignItems: 'stretch',
+        }}
+      >
+        <div
+          style={{
+            border: '1px solid #334155',
+            borderRadius: 'var(--radius-sm)',
+            padding: '10px',
+            backgroundColor: 'rgba(17,24,39,0.9)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <SpriteFrame src={spriteUrl} alt={pokemon.name} width={52} height={52} fallbackLabel="?" />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
                 style={{
-                  display: 'inline-block',
-                  padding: '2px 8px',
-                  backgroundColor: 'var(--color-bg-card)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: '0.7rem',
-                  color: 'var(--color-text-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  flexWrap: 'wrap',
                 }}
               >
-                {move}
-              </span>
+                <div style={{ color: '#F8FAFC', fontWeight: 700, fontSize: '1rem' }}>{pokemon.name}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {(pokemon.types ?? []).map((type) => (
+                    <PokemonTypeBadge
+                      key={`${pokemon.name}-${type}`}
+                      type={type}
+                      style={{ fontSize: '0.65rem', padding: '3px 8px', borderRadius: '5px' }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div style={{ color: '#93C5FD', fontSize: '0.8rem', fontWeight: 600 }}>Lv. {pokemon.level}</div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '6px 10px',
+              marginBottom: 10,
+            }}
+          >
+            <InfoItem label="Ability" value={pokemon.ability} />
+            <InfoItem label="Item" value={pokemon.item} blankWhenNull />
+            <InfoItem label="Nature" value={pokemon.nature} />
+          </div>
+
+          {pokemon.moves.length > 0 && (
+            <div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#94A3B8',
+                  marginBottom: 6,
+                }}
+              >
+                Moves
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {pokemon.moves.map((move) => (
+                  <span
+                    key={move}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '999px',
+                      fontSize: '0.72rem',
+                      border: '1px solid #475569',
+                      backgroundColor: 'rgba(30,41,59,0.8)',
+                      color: '#E2E8F0',
+                    }}
+                  >
+                    {move}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            border: '1px solid #334155',
+            borderRadius: 'var(--radius-sm)',
+            padding: '10px',
+            backgroundColor: 'rgba(2,6,23,0.95)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          {pokemon.stats && (
+            <div>
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: '#94A3B8',
+                  marginBottom: 6,
+                }}
+              >
+                Battle Stats
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {STAT_LABELS.map(({ key, label }) => {
+                  const value = pokemon.stats![key];
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '34px 1fr 34px',
+                        gap: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.72rem', color: '#94A3B8', textAlign: 'right' }}>
+                        {label}
+                      </span>
+                      <div
+                        style={{
+                          height: 9,
+                          borderRadius: 999,
+                          overflow: 'hidden',
+                          backgroundColor: '#1E293B',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min((value / STAT_MAX) * 100, 100)}%`,
+                            height: '100%',
+                            backgroundColor: getStatBarColor(value),
+                          }}
+                        />
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          color: '#F8FAFC',
+                          textAlign: 'right',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <StatDictRow label="IVs" stats={pokemon.ivs} />
+          <StatDictRow label="DVs" stats={pokemon.dvs} />
+          <StatDictRow label="EVs" stats={pokemon.evs} />
+        </div>
+      </div>
+
+      {extraFields.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+            Other Stored Data
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+            {extraFields.map(([key, value]) => (
+              <InfoItem key={key} label={formatLabel(key)} value={formatValue(value)} />
             ))}
           </div>
         </div>
       )}
 
-      {/* Fallback if no stats and no moves */}
-      {!pokemon.stats && pokemon.moves.length === 0 && (
-        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
-          No detailed data available.
-        </div>
-      )}
+    </div>
+  );
+}
+
+function StatDictRow({ label, stats }: { label: string; stats?: Record<string, number> | null }) {
+  if (!stats || Object.keys(stats).length === 0) return null;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {Object.entries(stats).map(([key, value]) => (
+          <span
+            key={key}
+            style={{
+              padding: '3px 8px',
+              border: '1px solid #475569',
+              borderRadius: '999px',
+              fontSize: '0.72rem',
+              color: '#E2E8F0',
+              backgroundColor: 'rgba(30,41,59,0.8)',
+            }}
+          >
+            {key.toUpperCase()}: {value}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InfoItem({
+  label,
+  value,
+  blankWhenNull = false,
+}: {
+  label: string;
+  value: unknown;
+  blankWhenNull?: boolean;
+}) {
+  const displayValue =
+    blankWhenNull && (value == null || value === '') ? '' : formatValue(value);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <span style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: '0.8rem', color: '#F1F5F9' }}>{displayValue}</span>
+    </div>
+  );
+}
+
+function SpriteFrame({
+  src,
+  alt,
+  width,
+  height,
+  fallbackLabel,
+  rounded,
+}: {
+  src: string | null;
+  alt: string;
+  width: number;
+  height: number;
+  fallbackLabel: string;
+  rounded?: boolean;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const showImage = !!src && !imgError;
+
+  if (showImage) {
+    return (
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setImgError(true)}
+        style={{
+          width,
+          height,
+          objectFit: 'contain',
+          imageRendering: 'pixelated',
+          borderRadius: rounded ? 8 : 'var(--radius-sm)',
+          border: '1px solid #475569',
+          backgroundColor: 'rgba(15,23,42,0.75)',
+          flexShrink: 0,
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width,
+        height,
+        borderRadius: rounded ? 8 : 'var(--radius-sm)',
+        backgroundColor: '#1E293B',
+        color: '#94A3B8',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 700,
+        border: '1px solid #475569',
+        flexShrink: 0,
+      }}
+    >
+      {fallbackLabel}
     </div>
   );
 }

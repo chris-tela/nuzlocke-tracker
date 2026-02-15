@@ -501,7 +501,7 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
       <div style={{
         color: 'var(--color-text-primary)',
         fontSize: '12px',
-        marginBottom: '12px',
+        marginBottom: '6px',
         fontFamily: 'var(--font-pokemon)',
         lineHeight: '1.4',
         letterSpacing: '0px',
@@ -514,13 +514,13 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
         <div style={{
           color: 'var(--color-text-secondary)',
           fontSize: '11px',
-          marginBottom: '8px',
+          marginBottom: '4px',
           fontFamily: 'var(--font-pokemon)',
-          lineHeight: '1.4',
+          lineHeight: '1.2',
           letterSpacing: '0px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '4px',
         }}>
           <span>Starter:</span>
           {getPokemonSpritePath(gameFile.starter_pokemon) ? (
@@ -528,8 +528,8 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
               src={getPokemonSpritePath(gameFile.starter_pokemon)}
               alt={gameFile.starter_pokemon}
               style={{
-                width: '24px',
-                height: '24px',
+                width: '48px',
+                height: '48px',
                 objectFit: 'contain',
                 imageRendering: 'pixelated',
               }}

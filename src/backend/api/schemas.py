@@ -182,9 +182,20 @@ class TrainerPokemonStats(BaseModel):
 class TrainerPokemon(BaseModel):
     name: str
     poke_id: Optional[int] = None
+    index: Optional[str] = None
     level: int
+    types: List[str] = []
+    ability: Optional[str] = None
+    item: Optional[str] = None
+    nature: Optional[str] = None
+    ivs: Optional[Dict[str, int]] = None
+    dvs: Optional[Dict[str, int]] = None
+    evs: Optional[Dict[str, int]] = None
     moves: List[str] = []
     stats: Optional[TrainerPokemonStats] = None
+
+class TrainerMatchupResponse(BaseModel):
+    score_percent: int
 
 class TrainerResponse(BaseModel):
     id: int
