@@ -197,6 +197,18 @@ class TrainerPokemon(BaseModel):
 class TrainerMatchupResponse(BaseModel):
     score_percent: int
 
+class TrainerMoveDetailRequest(BaseModel):
+    names: List[str]
+
+class TrainerMoveDetailResponse(BaseModel):
+    requested_name: str
+    name: Optional[str] = None
+    type_name: Optional[str] = None
+    pp: Optional[int] = None
+    power: Optional[int] = None
+    damage_class: Optional[str] = None
+    effect: Optional[str] = None
+
 class TrainerResponse(BaseModel):
     id: int
     generation: int

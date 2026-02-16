@@ -1,8 +1,17 @@
 import { useMemo, useState } from 'react';
-import type { Trainer, TrainerPokemon, TrainerPokemonStats } from '../types/trainer';
-import { resolvePokemonSpriteUrl, resolveTrainerSpriteUrl } from '../utils/spriteResolvers';
+import type {
+  Trainer,
+  TrainerMoveDetail,
+  TrainerPokemon,
+  TrainerPokemonStats,
+} from '../types/trainer';
+import {
+  resolveDamageClassIconUrl,
+  resolvePokemonSpriteUrl,
+  resolveTrainerSpriteUrl,
+} from '../utils/spriteResolvers';
 import { PokemonTypeBadge } from './PokemonTypeBadge';
-import { getTrainerMatchupSynergy } from '../services/trainerService';
+import { getTrainerMatchupSynergy, getTrainerMoveDetails } from '../services/trainerService';
 const STAT_MAX = 255;
 
 const IMPORTANCE_BADGES: Record<string, { color: string; label: string }> = {
@@ -78,6 +87,9 @@ export function TrainerCard({
   const [matchupScore, setMatchupScore] = useState<number | null>(null);
   const [isLoadingMatchup, setIsLoadingMatchup] = useState(false);
   const [matchupError, setMatchupError] = useState<string | null>(null);
+  const [moveDetailsByName, setMoveDetailsByName] = useState<Record<string, TrainerMoveDetail>>({});
+  const [isLoadingMoves, setIsLoadingMoves] = useState(false);
+  const [movesError, setMovesError] = useState<string | null>(null);
   const badge = trainer.importance_reason ? IMPORTANCE_BADGES[trainer.importance_reason] : null;
   const trainerSpriteUrl = resolveTrainerSpriteUrl(trainer.trainer_image);
 
@@ -90,6 +102,38 @@ export function TrainerCard({
     ],
     [trainer]
   );
+
+  const allMoveNames = useMemo(() => {
+    return Array.from(
+      new Set(
+        trainer.pokemon.flatMap((pokemon) => pokemon.moves ?? []).map((move) => move?.trim()).filter(Boolean) as string[]
+      )
+    );
+  }, [trainer.pokemon]);
+
+  const loadMoveDetails = async () => {
+    if (isLoadingMoves || allMoveNames.length === 0) return;
+
+    const missing = allMoveNames.filter((name) => !moveDetailsByName[name]);
+    if (missing.length === 0) return;
+
+    setIsLoadingMoves(true);
+    setMovesError(null);
+    try {
+      const details = await getTrainerMoveDetails(missing);
+      setMoveDetailsByName((prev) => {
+        const next = { ...prev };
+        for (const detail of details) {
+          next[detail.requested_name] = detail;
+        }
+        return next;
+      });
+    } catch {
+      setMovesError('Could not load move details.');
+    } finally {
+      setIsLoadingMoves(false);
+    }
+  };
 
   const handleMatchupClick = async () => {
     if (gameFileId == null || !canEvaluateMatchup || isLoadingMatchup) return;
@@ -106,6 +150,14 @@ export function TrainerCard({
     }
   };
 
+  const handleToggleExpanded = () => {
+    const next = !isExpanded;
+    setIsExpanded(next);
+    if (next) {
+      void loadMoveDetails();
+    }
+  };
+
   return (
     <div
       style={{
@@ -118,7 +170,7 @@ export function TrainerCard({
     >
       <button
         type="button"
-        onClick={() => setIsExpanded((prev) => !prev)}
+        onClick={handleToggleExpanded}
         aria-expanded={isExpanded}
         style={{
           width: '100%',
@@ -215,9 +267,17 @@ export function TrainerCard({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {trainer.pokemon.map((pokemon, index) => (
-              <PokemonBattlePanel key={`${pokemon.name}-${index}`} pokemon={pokemon} />
+              <PokemonBattlePanel
+                key={`${pokemon.name}-${index}`}
+                pokemon={pokemon}
+                moveDetailsByName={moveDetailsByName}
+              />
             ))}
           </div>
+
+          {movesError && (
+            <div style={{ marginTop: 4, fontSize: '0.75rem', color: '#FCA5A5' }}>{movesError}</div>
+          )}
 
           <div style={{ marginTop: 6, borderTop: '1px solid #334155', paddingTop: 10 }}>
             <button
@@ -258,8 +318,18 @@ export function TrainerCard({
   );
 }
 
-function PokemonBattlePanel({ pokemon }: { pokemon: TrainerPokemon }) {
+function PokemonBattlePanel({
+  pokemon,
+  moveDetailsByName,
+}: {
+  pokemon: TrainerPokemon;
+  moveDetailsByName: Record<string, TrainerMoveDetail>;
+}) {
   const spriteUrl = resolvePokemonSpriteUrl(pokemon.name, pokemon.poke_id);
+  const moveGridTemplateColumns =
+    pokemon.moves.length === 4
+      ? 'repeat(2, minmax(0, 1fr))'
+      : 'repeat(auto-fit, minmax(160px, 1fr))';
   const extraFields = Object.entries(pokemon).filter(([key, value]) => {
     if (KNOWN_POKEMON_FIELDS.has(key)) return false;
     if (value == null) return false;
@@ -344,21 +414,21 @@ function PokemonBattlePanel({ pokemon }: { pokemon: TrainerPokemon }) {
               >
                 Moves
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: moveGridTemplateColumns,
+                  gap: 8,
+                  width: '100%',
+                  minWidth: 0,
+                }}
+              >
                 {pokemon.moves.map((move) => (
-                  <span
+                  <MoveCard
                     key={move}
-                    style={{
-                      padding: '3px 8px',
-                      borderRadius: '999px',
-                      fontSize: '0.72rem',
-                      border: '1px solid #475569',
-                      backgroundColor: 'rgba(30,41,59,0.8)',
-                      color: '#E2E8F0',
-                    }}
-                  >
-                    {move}
-                  </span>
+                    moveName={move}
+                    detail={moveDetailsByName[move]}
+                  />
                 ))}
               </div>
             </div>
@@ -457,6 +527,117 @@ function PokemonBattlePanel({ pokemon }: { pokemon: TrainerPokemon }) {
       )}
 
     </div>
+  );
+}
+
+function MoveCard({ moveName, detail }: { moveName: string; detail?: TrainerMoveDetail }) {
+  const [showDescription, setShowDescription] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const supportsHover =
+    typeof window !== 'undefined' ? window.matchMedia('(hover: hover)').matches : true;
+  const typeName = detail?.type_name ?? 'unknown';
+  const typeBorderColor = `var(--color-type-${typeName})`;
+  const damageClassIconUrl = resolveDamageClassIconUrl(detail?.damage_class);
+  const powerLabel = detail?.power != null ? String(detail.power) : '-';
+  const ppLabel = detail?.pp != null ? String(detail.pp) : '-';
+  const description = detail?.effect || 'No description available.';
+  const showTooltip = supportsHover ? isHovered || showDescription : showDescription;
+
+  return (
+    <button
+      type="button"
+      onMouseEnter={() => supportsHover && setIsHovered(true)}
+      onMouseLeave={() => supportsHover && setIsHovered(false)}
+      onClick={() => {
+        if (!supportsHover) {
+          setShowDescription((prev) => !prev);
+        }
+      }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+        boxSizing: 'border-box',
+        textAlign: 'left',
+        border: `2px solid ${typeBorderColor}`,
+        borderRadius: '8px',
+        backgroundColor: 'rgba(15,23,42,0.9)',
+        padding: '8px',
+        color: '#E2E8F0',
+        cursor: 'pointer',
+        overflow: 'visible',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <span
+          style={{
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            color: '#F8FAFC',
+            minWidth: 0,
+            overflowWrap: 'anywhere',
+          }}
+        >
+          {moveName}
+        </span>
+        <PokemonTypeBadge
+          type={typeName}
+          style={{
+            fontSize: '0.52rem',
+            padding: '2px 6px',
+            borderRadius: '4px',
+            flexShrink: 0,
+            maxWidth: '100%',
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          marginTop: 6,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr auto',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <span style={{ fontSize: '0.68rem', color: '#93C5FD' }}>PP {ppLabel}</span>
+        <span style={{ fontSize: '0.68rem', color: '#FCD34D' }}>PWR {powerLabel}</span>
+        {damageClassIconUrl ? (
+          <img
+            src={damageClassIconUrl}
+            alt={detail?.damage_class ?? 'damage class'}
+            style={{ width: 24, height: 24, objectFit: 'contain' }}
+          />
+        ) : (
+          <span style={{ fontSize: '0.62rem', color: '#94A3B8' }}>{detail?.damage_class ?? '-'}</span>
+        )}
+      </div>
+
+      {showTooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 'calc(100% + 6px)',
+            zIndex: 50,
+            padding: '8px 10px',
+            border: '1px solid #64748B',
+            borderRadius: '8px',
+            backgroundColor: '#0B1220',
+            boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
+            fontSize: '0.7rem',
+            lineHeight: 1.4,
+            color: '#CBD5E1',
+            pointerEvents: 'none',
+          }}
+        >
+          {description}
+        </div>
+      )}
+    </button>
   );
 }
 

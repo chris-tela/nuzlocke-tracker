@@ -42,3 +42,13 @@ export interface Trainer {
 export interface TrainerMatchupResponse {
   score_percent: number;
 }
+
+export interface TrainerMoveDetail {
+  requested_name: string;
+  name?: string | null;
+  type_name?: string | null;
+  pp?: number | null;
+  power?: number | null;
+  damage_class?: string | null;
+  effect?: string | null;
+}

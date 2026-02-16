@@ -2,6 +2,7 @@
 Trainer data router.
 Serves precomputed trainer data from the Trainer table.
 """
+import re
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -10,10 +11,88 @@ from sqlalchemy import asc, func
 from ...db import models
 from ...team_synergy import score_team_matchup
 from ..dependencies import get_current_user, get_db
-from ..schemas import TrainerMatchupResponse, TrainerResponse
+from ..schemas import (
+    TrainerMatchupResponse,
+    TrainerMoveDetailRequest,
+    TrainerMoveDetailResponse,
+    TrainerResponse,
+)
 from ..utils import verify_game_file
 
 router = APIRouter()
+
+
+def _normalize_move_name(move_name: str) -> str:
+    raw = (move_name or "").strip().lower()
+    raw = re.sub(r"\s*[x×]\s*\d+\s*$", "", raw)
+    raw = re.sub(r"\s+", " ", raw).strip()
+    return raw
+
+
+def _move_name_candidates(move_name: str) -> list[str]:
+    normalized = _normalize_move_name(move_name)
+    if not normalized:
+        return []
+
+    ascii_safe = re.sub(r"[^a-z0-9\s\-']", "", normalized)
+    hyphenated = ascii_safe.replace(" ", "-")
+    compact = ascii_safe.replace(" ", "")
+    return [normalized, ascii_safe, hyphenated, compact]
+
+
+@router.post("/moves/details", response_model=list[TrainerMoveDetailResponse])
+async def get_trainer_move_details(
+    payload: TrainerMoveDetailRequest,
+    db: Session = Depends(get_db),
+):
+    """Get move table details for a batch of trainer move names."""
+    requested_names = [name for name in payload.names if isinstance(name, str) and name.strip()]
+    if len(requested_names) == 0:
+        return []
+
+    all_candidates: set[str] = set()
+    candidates_by_requested: dict[str, list[str]] = {}
+    for move_name in requested_names:
+        candidates = _move_name_candidates(move_name)
+        candidates_by_requested[move_name] = candidates
+        all_candidates.update(candidates)
+
+    move_rows = {}
+    if all_candidates:
+        move_rows = {
+            row.name: row
+            for row in db.query(models.Move).filter(models.Move.name.in_(all_candidates)).all()
+        }
+
+    results: list[TrainerMoveDetailResponse] = []
+    for requested in requested_names:
+        match = None
+        for candidate in candidates_by_requested.get(requested, []):
+            if candidate in move_rows:
+                match = move_rows[candidate]
+                break
+
+        if match is None:
+            results.append(
+                TrainerMoveDetailResponse(
+                    requested_name=requested,
+                )
+            )
+            continue
+
+        results.append(
+            TrainerMoveDetailResponse(
+                requested_name=requested,
+                name=match.name,
+                type_name=match.type_name,
+                pp=match.pp,
+                power=match.power,
+                damage_class=match.damage_class,
+                effect=match.effect,
+            )
+        )
+
+    return results
 
 
 def _hydrate_trainer_pokemon_types(trainers: list[models.Trainer], db: Session) -> list[models.Trainer]:

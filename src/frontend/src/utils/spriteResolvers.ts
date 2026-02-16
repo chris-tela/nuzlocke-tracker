@@ -84,3 +84,11 @@ export function resolvePokemonSpriteUrl(pokemonName?: string | null, pokeId?: nu
 
   return null;
 }
+
+export function resolveDamageClassIconUrl(damageClass?: string | null): string | null {
+  if (!damageClass) return null;
+  const normalized = damageClass.trim().toLowerCase();
+  if (!normalized) return null;
+  const frontendBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+  return `${frontendBase}/damage_class/${normalized}.png`;
+}

@@ -1,5 +1,5 @@
 import { apiHelpers } from './api';
-import type { Trainer, TrainerMatchupResponse } from '../types/trainer';
+import type { Trainer, TrainerMatchupResponse, TrainerMoveDetail } from '../types/trainer';
 
 export const getTrainersByGame = async (
   gameName: string,
@@ -33,5 +33,14 @@ export const getTrainerMatchupSynergy = async (
 ): Promise<TrainerMatchupResponse> => {
   return await apiHelpers.get<TrainerMatchupResponse>(
     `/api/trainers/matchup/${trainerId}?gameFileId=${gameFileId}`
+  );
+};
+
+export const getTrainerMoveDetails = async (
+  moveNames: string[]
+): Promise<TrainerMoveDetail[]> => {
+  return await apiHelpers.post<TrainerMoveDetail[]>(
+    '/api/trainers/moves/details',
+    { names: moveNames }
   );
 };
