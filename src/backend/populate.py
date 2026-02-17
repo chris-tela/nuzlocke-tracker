@@ -30,7 +30,10 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
             try:
                 pokemon = response.json()
                 id, poke_id = pokemon["id"], pokemon["id"]
-                name = pokemon["forms"][0]["name"]
+                name = pokemon["species"]["name"] # TODO: populate
+                
+                forms = [pokemon["forms"][i]["name"] for i in range(len(pokemon["forms"]))]
+               
                 types = [pokemon["types"][i]["type"]["name"] for i in range(len(pokemon["types"]))]
                 past_types = get_past_types(pokemon)
                 abilities = [pokemon["abilities"][i]["ability"]["name"] for i in range(len(pokemon["abilities"]))]
@@ -77,7 +80,9 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
             id = id,
             poke_id = poke_id,
             name = name,
+            forms = forms,
             types = types,
+            past_types = past_types,
             abilities = abilities,
             weight = weight,
             base_hp = base_hp,
@@ -90,8 +95,11 @@ async def populate_pokemon(db: Session = Depends(database.get_db)):
             created_at = created_at
         )
         db.add(pokemon)
-        db.commit()
+        if poke_id % 50 == 0:
+            print("commited last 50 entries!")
+            db.commit()
         index += 1
+    db.commit()
     db.close()
 
     return {"message": "Pokemon populated successfully"}
@@ -119,7 +127,7 @@ def get_past_types(pokemon: dict):
 
 
 response = requests.get(f"https://pokeapi.co/api/v2/pokemon/jigglypuff")
-get_past_types(response.json())
+print(get_past_types(response.json()))
 
 def evolution_parse(chain: dict, name: str):
  # format of 'chain' in pokemon_attributes:

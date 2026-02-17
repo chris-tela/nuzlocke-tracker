@@ -4,6 +4,7 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.sqltypes import TIMESTAMP
 from sqlalchemy.sql.expression import text
+from sqlalchemy.ext.mutable import MutableDict, MutableList
 from .database import Base
 
 class Nature(enum.Enum):
@@ -45,8 +46,9 @@ class AllPokemon(Base):
     id = Column(Integer, nullable=False, autoincrement=True)
     poke_id = Column(Integer, primary_key=True, nullable=False)
     name = Column(String, nullable=False)
+    forms = Column(MutableList.as_mutable(JSON), nullable=True)
     types = Column(ARRAY(String), nullable=False)
-    past_types = Column(ARRAY(JSON), nullable=True)
+    past_types = Column(MutableDict.as_mutable(JSON), nullable=True)
     abilities = Column(ARRAY(String), nullable=False)
     weight = Column(Integer, nullable=False)
     base_hp = Column(Integer, nullable=False)
@@ -57,6 +59,19 @@ class AllPokemon(Base):
     base_speed = Column(Integer, nullable=False)
     evolution_data = Column(ARRAY(JSON), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+    all_pokemon_forms = relationship("AllPokemonForms", back_populates="pokemon")
+
+
+# loops through all existing
+class AllPokemonForms(Base):
+    __tablename__ = "all_pokemon_forms"
+
+    id = Column(Integer, primary_key=True, nullable=False, autoincrement=True)
+    form_name = Column(String)
+
+    pokemon_id = Column(Integer, ForeignKey("all_pokemon.poke_id"))
+    pokemon = relationship("AllPokemon", back_populates="all_pokemon_forms")
+
 
 
 class OwnedPokemon(Base):
