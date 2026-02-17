@@ -85,10 +85,32 @@ export function resolvePokemonSpriteUrl(pokemonName?: string | null, pokeId?: nu
   return null;
 }
 
+export function resolveBadgeImageUrl(gymPath?: string | null): string | null {
+  if (!gymPath) return null;
+
+  const source = normalizeSlashes(gymPath);
+  if (!source) return null;
+
+  const baseUrl = normalizeBaseUrl(API_BASE_URL);
+
+  // "data/badges/red_1.webp" -> "/data-badges/red_1.webp"
+  if (source.startsWith('data/badges/')) {
+    return `${baseUrl}/data-badges/${source.replace('data/badges/', '')}`;
+  }
+
+  // "../data/badges/red_1.webp"
+  if (source.startsWith('../data/badges/')) {
+    return `${baseUrl}/data-badges/${source.replace('../data/badges/', '')}`;
+  }
+
+  return `${baseUrl}/data-badges/${source.replace(/^\.?\//, '')}`;
+}
+
 export function resolveDamageClassIconUrl(damageClass?: string | null): string | null {
   if (!damageClass) return null;
   const normalized = damageClass.trim().toLowerCase();
   if (!normalized) return null;
+  if (!['physical', 'special', 'status'].includes(normalized)) return null;
   const frontendBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
-  return `${frontendBase}/damage_class/${normalized}.png`;
+  return `${frontendBase}/damage_class/${normalized}.svg`;
 }

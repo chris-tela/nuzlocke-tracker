@@ -388,7 +388,13 @@ def get_trainer_data_filename_from_game_name(game_name: str) -> str:
 def populate_gyms(db: Session = Depends(database.get_db)):
     """Populate gym table from trainer_data JSON files."""
     import os
-    
+
+    # Clear existing gym data for a clean repopulate.
+    deleted = db.query(models.Gym).delete()
+    db.commit()
+    if deleted:
+        print(f"Cleared {deleted} existing Gym rows.")
+
     # Get all versions from database
     versions = db.query(models.Version).all()
     
@@ -426,6 +432,7 @@ def populate_gyms(db: Session = Depends(database.get_db)):
                         game_name=game_name,
                         gym_number=gym_entry['gym_number'],
                         gym_path=f"data/badges/{game_name}_{gym_entry['gym_number']}.webp",
+                        badge_path=f"data/badges/{game_name}_{gym_entry['gym_number']}.webp",
                         location=gym_entry['location'],
                         trainer_name=gym_entry['trainer_name'],
                         trainer_image=gym_entry['trainer_image'],
@@ -501,6 +508,7 @@ def populate_gyms(db: Session = Depends(database.get_db)):
                 game_name=game_name,
                 gym_number=gym_entry['gym_number'],
                 gym_path=f"data/badges/{game_name}_{gym_entry['gym_number']}.webp",
+                badge_path=f"data/badges/{game_name}_{gym_entry['gym_number']}.webp",
                 location=gym_entry['location'],
                 trainer_name=gym_entry['trainer_name'],
                 trainer_image=gym_entry['trainer_image'],
@@ -509,7 +517,7 @@ def populate_gyms(db: Session = Depends(database.get_db)):
                 pokemon=gym_entry['pokemon']
             )
             db.add(gym)
-    
+
     db.commit()
     db.close()
     return {"message": "Gyms populated successfully"}

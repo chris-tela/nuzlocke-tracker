@@ -9,10 +9,13 @@ import { useGymProgress, useUpcomingGyms, useAddGym, useVersionGyms } from '../h
 import { PokemonTypeBadge } from '../components/PokemonTypeBadge';
 import { usePokemonInfoByName } from '../hooks/usePokemon';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
+import { resolveTrainerSpriteUrl, resolveBadgeImageUrl } from '../utils/spriteResolvers';
 
 // Type for gym data from the API
 interface GymData {
   gym_number: string;
+  gym_path?: string;
+  badge_path?: string;
   location: string;
   badge_name: string;
   trainer_name?: string;
@@ -112,10 +115,100 @@ const PokemonTypes = ({ pokemonName }: { pokemonName: string }) => {
   );
 };
 
+const TransparentBadgeImage = ({
+  src,
+  alt,
+  width,
+  height,
+}: {
+  src: string;
+  alt: string;
+  width: string;
+  height: string;
+}) => {
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+
+  useEffect(() => {
+    let cancelled = false;
+    setResolvedSrc(src);
+
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(image, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const pixels = imageData.data;
+
+        // Remove white matte/halo pixels while preserving real badge colors.
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i];
+          const g = pixels[i + 1];
+          const b = pixels[i + 2];
+          const a = pixels[i + 3];
+          if (a === 0) continue;
+
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const saturation = max === 0 ? 0 : (max - min) / max;
+          const isNearWhite = r >= 236 && g >= 236 && b >= 236;
+          const isLowSaturation = saturation <= 0.12;
+
+          if (isNearWhite && isLowSaturation) {
+            pixels[i + 3] = 0;
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        if (!cancelled) {
+          setResolvedSrc(canvas.toDataURL('image/png'));
+        }
+      } catch {
+        if (!cancelled) {
+          setResolvedSrc(src);
+        }
+      }
+    };
+    image.onerror = () => {
+      if (!cancelled) {
+        setResolvedSrc(src);
+      }
+    };
+    image.src = src;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
+
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      style={{
+        width,
+        height,
+        objectFit: 'contain',
+        backgroundColor: 'transparent',
+      }}
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+      }}
+    />
+  );
+};
+
 // Component for individual gym badge in timeline
 const BadgeItem = ({
   gymNumber,
   badgeName,
+  badgeImageUrl,
   location,
   isCompleted,
   isSelected,
@@ -123,6 +216,7 @@ const BadgeItem = ({
 }: {
   gymNumber: string;
   badgeName: string;
+  badgeImageUrl: string | null;
   location: string;
   isCompleted: boolean;
   isSelected: boolean;
@@ -139,20 +233,19 @@ const BadgeItem = ({
         cursor: 'pointer',
         padding: '12px',
         borderRadius: '12px',
-        border: isSelected 
-          ? '2px solid var(--color-pokemon-primary)' 
-          : isCompleted 
+        border: isSelected
+          ? '2px solid var(--color-pokemon-primary)'
+          : isCompleted
             ? '2px solid var(--color-pokemon-green)'
             : '1px solid var(--color-border)',
-        backgroundColor: isSelected 
-          ? 'var(--color-bg-light)' 
-          : isCompleted 
-            ? 'var(--color-bg-card)' 
+        backgroundColor: isSelected
+          ? 'var(--color-bg-light)'
+          : isCompleted
+            ? 'var(--color-bg-card)'
             : 'var(--color-bg-light)',
         transition: 'all 150ms ease',
         minWidth: '100px',
         opacity: isCompleted || isSelected ? 1 : 0.6,
-        filter: isCompleted ? 'none' : 'grayscale(100%)',
         boxShadow: isSelected ? '0 0 8px rgba(79, 70, 229, 0.5)' : 'none',
       }}
       onMouseEnter={(e) => {
@@ -174,25 +267,44 @@ const BadgeItem = ({
         }
       }}
     >
-      {/* Badge Icon Placeholder */}
+      {/* Badge Image */}
       <div
         style={{
           width: '56px',
           height: '56px',
-          borderRadius: '50%',
-          backgroundColor: isCompleted 
-            ? 'var(--color-pokemon-green)' 
-            : 'var(--color-bg-card)',
-          border: `3px solid ${isCompleted ? 'var(--color-pokemon-green)' : 'var(--color-border)'}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '1.5rem',
-          fontWeight: 'bold',
-          color: isCompleted ? 'var(--color-text-white)' : 'var(--color-text-secondary)',
         }}
       >
-        {gymNumber}
+        {badgeImageUrl ? (
+          <TransparentBadgeImage
+            src={badgeImageUrl}
+            alt={badgeName}
+            width="100%"
+            height="100%"
+          />
+        ) : (
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              backgroundColor: isCompleted
+                ? 'var(--color-pokemon-green)'
+                : 'var(--color-bg-card)',
+              border: `3px solid ${isCompleted ? 'var(--color-pokemon-green)' : 'var(--color-border)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              color: isCompleted ? 'var(--color-text-white)' : 'var(--color-text-secondary)',
+            }}
+          >
+            {gymNumber}
+          </div>
+        )}
       </div>
       <div
         style={{
@@ -232,6 +344,8 @@ export const GymsPage = () => {
     // Start with all version gyms (1-8) to ensure we have complete data
     const versionGymsData: GymData[] = (versionGyms as any[]).map((gym: any) => ({
       gym_number: String(gym.gym_number),
+      gym_path: gym.gym_path,
+      badge_path: gym.badge_path,
       location: gym.location || '',
       badge_name: gym.badge_name || '',
       trainer_name: gym.trainer_name,
@@ -414,6 +528,7 @@ export const GymsPage = () => {
                       key={gymNumber}
                       gymNumber={gymNumber}
                       badgeName="???"
+                      badgeImageUrl={null}
                       location="Unknown"
                       isCompleted={false}
                       isSelected={false}
@@ -427,6 +542,7 @@ export const GymsPage = () => {
                     key={gymNumber}
                     gymNumber={gymNumber}
                     badgeName={gym.badge_name}
+                    badgeImageUrl={resolveBadgeImageUrl(gym.badge_path || gym.gym_path)}
                     location={gym.location}
                     isCompleted={isCompleted}
                     isSelected={selectedGymNumber === gymNumber}
@@ -475,11 +591,27 @@ export const GymsPage = () => {
                     style={{
                       fontSize: '0.85rem',
                       color: 'var(--color-text-secondary)',
-                      marginBottom: '4px',
+                      marginBottom: '8px',
                     }}
                   >
                     Badge
                   </div>
+                  {resolveBadgeImageUrl(selectedGym.badge_path || selectedGym.gym_path) && (
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <TransparentBadgeImage
+                        src={resolveBadgeImageUrl(selectedGym.badge_path || selectedGym.gym_path)!}
+                        alt={selectedGym.badge_name}
+                        width="100%"
+                        height="100%"
+                      />
+                    </div>
+                  )}
                   <div
                     style={{
                       fontSize: '1.1rem',
@@ -509,7 +641,7 @@ export const GymsPage = () => {
                     >
                       Gym Leader
                     </div>
-                    {selectedGym.trainer_image && (
+                    {resolveTrainerSpriteUrl(selectedGym.trainer_image) && (
                       <div
                         style={{
                           width: '120px',
@@ -525,13 +657,13 @@ export const GymsPage = () => {
                         }}
                       >
                         <img
-                          src={selectedGym.trainer_image}
+                          src={resolveTrainerSpriteUrl(selectedGym.trainer_image)!}
                           alt={selectedGym.trainer_name}
                           style={{
                             width: '100%',
                             height: '100%',
                             objectFit: 'contain',
-                            imageRendering: 'auto',
+                            imageRendering: 'pixelated',
                           }}
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';

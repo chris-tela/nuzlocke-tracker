@@ -163,6 +163,7 @@ class Gym(Base):
     game_name = Column(String, nullable=False)
     gym_number = Column(Integer, nullable=True)
     gym_path = Column(String, nullable=True)
+    badge_path = Column(String, nullable=True)
     location = Column(String, nullable=False)
     trainer_name = Column(String, nullable=True)
     trainer_image = Column(String, nullable=False)

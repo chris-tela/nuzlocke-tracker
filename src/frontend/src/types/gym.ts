@@ -14,9 +14,12 @@ export interface GymProgressEntry {
 
 export interface GymSummary {
   gym_number: string;
+  gym_path?: string;
+  badge_path?: string;
   location: string;
   badge_name: string;
   trainer_name?: string;
+  trainer_image?: string;
   badge_type?: string;
 }
 

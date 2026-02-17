@@ -8,6 +8,20 @@ import type { Trainer } from '../types/trainer';
 
 const TRAINERS_PER_PAGE = 20;
 type ScopeMode = 'all' | 'important';
+const ALL_IMPORTANCE_FILTER = '__all__';
+
+function normalizeImportanceReason(reason: string): string {
+  return reason.trim().toLowerCase().replace(/[_\s-]+/g, ' ');
+}
+
+function toImportanceLabel(reason: string): string {
+  return reason
+    .trim()
+    .replace(/^reason:\s*/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 export const TrainersPage = () => {
   const navigate = useNavigate();
@@ -22,6 +36,7 @@ export const TrainersPage = () => {
   const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFileId);
   const [scopeMode, setScopeMode] = useState<ScopeMode>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [importanceFilter, setImportanceFilter] = useState<string>(ALL_IMPORTANCE_FILTER);
   const [displayedTrainerCount, setDisplayedTrainerCount] = useState(TRAINERS_PER_PAGE);
 
   const sortedTrainers = useMemo(() => {
@@ -43,19 +58,42 @@ export const TrainersPage = () => {
     return trainers;
   }, [allTrainers]);
 
+  const importanceOptions = useMemo(() => {
+    const byReason = new Map<string, string>();
+    for (const trainer of sortedTrainers) {
+      if (!trainer.is_important || !trainer.importance_reason?.trim()) continue;
+      const normalized = normalizeImportanceReason(trainer.importance_reason);
+      if (!byReason.has(normalized)) {
+        byReason.set(normalized, toImportanceLabel(trainer.importance_reason));
+      }
+    }
+
+    return Array.from(byReason.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [sortedTrainers]);
+
   const visibleTrainers = useMemo(() => {
     const scoped =
       scopeMode === 'important'
         ? sortedTrainers.filter((trainer) => trainer.is_important)
         : sortedTrainers;
+    const byImportance =
+      importanceFilter === ALL_IMPORTANCE_FILTER
+        ? scoped
+        : scoped.filter(
+            (trainer) =>
+              trainer.importance_reason != null &&
+              normalizeImportanceReason(trainer.importance_reason) === importanceFilter
+          );
 
     const query = searchTerm.trim().toLowerCase();
     if (!query) {
-      return scoped;
+      return byImportance;
     }
 
-    return scoped.filter((trainer) => trainer.trainer_name.toLowerCase().includes(query));
-  }, [scopeMode, sortedTrainers, searchTerm]);
+    return byImportance.filter((trainer) => trainer.trainer_name.toLowerCase().includes(query));
+  }, [scopeMode, sortedTrainers, searchTerm, importanceFilter]);
 
   const displayedTrainers = useMemo(
     () => visibleTrainers.slice(0, displayedTrainerCount),
@@ -76,6 +114,11 @@ export const TrainersPage = () => {
 
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
+    setDisplayedTrainerCount(TRAINERS_PER_PAGE);
+  };
+
+  const handleImportanceFilterChange = (value: string) => {
+    setImportanceFilter(value);
     setDisplayedTrainerCount(TRAINERS_PER_PAGE);
   };
 
@@ -227,6 +270,29 @@ export const TrainersPage = () => {
               style={{ maxWidth: '420px' }}
             />
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '260px' }}>
+            <label
+              htmlFor="importance-filter"
+              style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', whiteSpace: 'nowrap' }}
+            >
+              Sort by
+            </label>
+            <select
+              id="importance-filter"
+              className="input"
+              value={importanceFilter}
+              onChange={(event) => handleImportanceFilterChange(event.target.value)}
+              style={{ maxWidth: '260px' }}
+            >
+              <option value={ALL_IMPORTANCE_FILTER}>All importance types</option>
+              {importanceOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div
@@ -252,7 +318,8 @@ export const TrainersPage = () => {
           <p style={{ color: 'var(--color-text-secondary)' }}>Loading trainers...</p>
         ) : visibleTrainers.length === 0 ? (
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            No trainers found for this filter{searchTerm.trim() ? ' and search' : ''}.
+            No trainers found for the selected filters
+            {searchTerm.trim() ? ' and search' : ''}.
           </p>
         ) : (
           <>

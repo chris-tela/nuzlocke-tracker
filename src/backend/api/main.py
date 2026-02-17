@@ -80,6 +80,10 @@ data_sprites_path = os.path.join(os.path.dirname(backend_dir), "data", "sprites"
 if os.path.exists(data_sprites_path):
     app.mount("/data-sprites", StaticFiles(directory=data_sprites_path), name="data-sprites")
 
+data_badges_path = os.path.join(os.path.dirname(backend_dir), "data", "badges")
+if os.path.exists(data_badges_path):
+    app.mount("/data-badges", StaticFiles(directory=data_badges_path), name="data-badges")
+
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])

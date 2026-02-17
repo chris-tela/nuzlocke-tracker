@@ -598,6 +598,66 @@ def _compute_pokemon_stats(
     }
 
 
+_GAME_SPLIT_RE = re.compile(r"^(.+?)\s*\((\d+)\)$")
+
+
+def _merge_split_trainers(entries: list[dict]) -> list[dict]:
+    """
+    Merge consecutive entries that represent the same trainer split across
+    multiple rows.  The source data uses a "(N)" suffix on the game field
+    (e.g. "HGSS (1)", "HGSS (2)") with one Pokemon per entry.
+
+    Returns a new list with split entries consolidated.
+    """
+    if not entries:
+        return entries
+
+    merged: list[dict] = []
+    i = 0
+
+    while i < len(entries):
+        entry = entries[i]
+        m = _GAME_SPLIT_RE.match(entry.get("game", ""))
+
+        if not m:
+            # Not a split entry — pass through as-is.
+            merged.append(entry)
+            i += 1
+            continue
+
+        base_game = m.group(1)
+        trainer_name = entry.get("trainer", "")
+        location = entry.get("location")
+
+        # Start a merge group from this entry.
+        combined = dict(entry)
+        combined["game"] = base_game
+        combined["pokemon"] = list(entry.get("pokemon", []))
+
+        j = i + 1
+        while j < len(entries):
+            next_entry = entries[j]
+            nm = _GAME_SPLIT_RE.match(next_entry.get("game", ""))
+            if (
+                nm
+                and nm.group(1) == base_game
+                and next_entry.get("trainer", "") == trainer_name
+                and next_entry.get("location") == location
+            ):
+                # Same trainer, same location, same base game — merge pokemon.
+                for poke in next_entry.get("pokemon", []):
+                    if len(combined["pokemon"]) < 6:
+                        combined["pokemon"].append(poke)
+                j += 1
+            else:
+                break
+
+        merged.append(combined)
+        i = j
+
+    return merged
+
+
 def populate(db: Session) -> None:
     pokemon_map = _build_pokemon_map(db)
     if not pokemon_map:
@@ -625,6 +685,13 @@ def populate(db: Session) -> None:
 
         with open(json_path, "r", encoding="utf-8") as f:
             entries = json.load(f)
+
+        # Merge split trainers (e.g. "HGSS (1)", "HGSS (2)" -> single entry).
+        before = len(entries)
+        entries = _merge_split_trainers(entries)
+        after = len(entries)
+        if before != after:
+            print(f"  Merged split trainers: {before} -> {after} entries ({before - after} consolidated)")
 
         # Determine whether this gen uses DVs (Gen 1-2) or IVs (Gen 3+).
         is_dv = generation <= 2
