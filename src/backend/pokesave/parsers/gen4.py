@@ -439,29 +439,51 @@ class Gen4Parser(BaseParser):
         )
 
     def _parse_badges(self, small_block: bytes, game: str) -> list[str]:
-        """Parse badge data from the small block."""
+        """Parse badge data from the small block.
+
+        Badge data is a bitmask at offset 0x7E (DP/HGSS) or 0x82 (Pt).
+        DP/Pt: 1 byte, bits 0-7 = 8 Sinnoh badges.
+        HGSS: 2 bytes, first byte = 8 Johto badges, second byte = 8 Kanto badges.
+        """
+        if "Platinum" in game:
+            badge_offset = 0x82
+        else:
+            badge_offset = 0x7E
+
         if "HeartGold" in game or "SoulSilver" in game:
             badge_names_johto = [
-                "Zephyr", "Insect", "Plain", "Fog",
+                "Zephyr", "Hive", "Plain", "Fog",
                 "Storm", "Mineral", "Glacier", "Rising",
             ]
             badge_names_kanto = [
                 "Boulder", "Cascade", "Thunder", "Rainbow",
                 "Soul", "Marsh", "Volcano", "Earth",
             ]
-            # HGSS has 16 badges. Badge data offset varies.
-            # Return empty list as placeholder -- exact offset needs testing
-            return []
-        elif "Diamond" in game or "Pearl" in game or "Platinum" in game:
-            badge_names = [
-                "Coal", "Forest", "Cobble", "Fen",
-                "Relic", "Mine", "Icicle", "Beacon",
-            ]
-        else:
-            badge_names = [f"Badge {i+1}" for i in range(8)]
+            if badge_offset + 2 > len(small_block):
+                return []
+            johto_byte = small_block[badge_offset]
+            kanto_byte = small_block[badge_offset + 1]
+            badges = []
+            for i, name in enumerate(badge_names_johto):
+                if johto_byte & (1 << i):
+                    badges.append(name)
+            for i, name in enumerate(badge_names_kanto):
+                if kanto_byte & (1 << i):
+                    badges.append(name)
+            return badges
 
-        # Badge offset is game-specific; return empty for now
-        return []
+        badge_names = [
+            "Coal", "Forest", "Cobble", "Fen",
+            "Relic", "Mine", "Icicle", "Beacon",
+        ]
+        if badge_offset + 1 > len(small_block):
+            return []
+        badge_byte = small_block[badge_offset]
+        badges = []
+        for i, name in enumerate(badge_names):
+            if badge_byte & (1 << i):
+                badges.append(name)
+        return badges
 
     def _parse_pokedex(
         self, small_block: bytes, game: str
