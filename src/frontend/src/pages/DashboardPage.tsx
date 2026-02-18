@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
 import { usePokemon, usePartyPokemon, useAddPokemon, usePokemonInfoByName, useSearchPokemon } from '../hooks/usePokemon';
 import { useUpcomingRoutes } from '../hooks/useRoutes';
-import { useUpcomingGyms, useGymProgress } from '../hooks/useGyms';
+import { useUpcomingGyms, useGymProgress, useVersionGyms } from '../hooks/useGyms';
 import { Nature, Status, type NatureValue, type StatusValue } from '../types/enums';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
+import { resolveBadgeImageUrl } from '../utils/spriteResolvers';
 import type { BasePokemon } from '../types';
 
 export const DashboardPage = () => {
@@ -18,6 +19,7 @@ export const DashboardPage = () => {
   const { data: gymProgress = [] } = useGymProgress(gameFileId);
   const { isLoading: isLoadingRoutes } = useUpcomingRoutes(gameFileId);
   const { data: upcomingGymsResponse, isLoading: isLoadingGyms } = useUpcomingGyms(gameFileId);
+  const { data: versionGyms = [] } = useVersionGyms(currentGameFile?.game_name || null);
   const addPokemonMutation = useAddPokemon(gameFileId);
 
   // Add Pokemon modal state
@@ -43,7 +45,41 @@ export const DashboardPage = () => {
       }`
     : 'No upcoming gyms';
 
-  const badgesCount = gymProgress.length;
+  const completedGymMap = new Map<number, any>();
+  gymProgress.forEach((gym: any) => {
+    const gymNumber = Number.parseInt(String(gym.gym_number), 10);
+    if (!Number.isFinite(gymNumber)) return;
+    if (!completedGymMap.has(gymNumber)) {
+      completedGymMap.set(gymNumber, gym);
+    }
+  });
+  const completedGyms = Array.from(completedGymMap.values()).sort(
+    (a: any, b: any) =>
+      Number.parseInt(String(a.gym_number), 10) - Number.parseInt(String(b.gym_number), 10)
+  );
+
+  const versionGymByNumber = new Map<number, any>();
+  (versionGyms as any[]).forEach((gym: any) => {
+    const gymNumber = Number.parseInt(String(gym.gym_number), 10);
+    if (!Number.isFinite(gymNumber)) return;
+    if (!versionGymByNumber.has(gymNumber)) {
+      versionGymByNumber.set(gymNumber, gym);
+    }
+  });
+
+  const achievedBadges = completedGyms.map((completedGym: any) => {
+    const gymNumber = Number.parseInt(String(completedGym.gym_number), 10);
+    const versionGym = Number.isFinite(gymNumber) ? versionGymByNumber.get(gymNumber) : undefined;
+    return {
+      gym_number: completedGym.gym_number,
+      location: completedGym.location || versionGym?.location || '',
+      badge_name: completedGym.badge_name || versionGym?.badge_name || `Gym ${completedGym.gym_number}`,
+      badge_path: versionGym?.badge_path,
+      gym_path: versionGym?.gym_path,
+    };
+  });
+
+  const badgesCount = completedGyms.length;
   const pokedexCount = allPokemon.length;
 
   const addLevel = parseInt(addLevelInput, 10) || 0;
@@ -223,7 +259,13 @@ export const DashboardPage = () => {
           gap: '24px',
         }}
       >
-        <div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+          }}
+        >
           <h1
             style={{
               color: 'var(--color-text-primary)',
@@ -259,6 +301,113 @@ export const DashboardPage = () => {
               {/* Use plain ASCII to avoid encoding issues */}
               <strong>Pokedex:</strong> {pokedexCount}
             </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              Badges Earned ({badgesCount})
+            </div>
+            {achievedBadges.length === 0 ? (
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.82rem' }}>
+                No badges earned yet.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                {achievedBadges.map((gym: any) => {
+                  const badgeSprite = resolveBadgeImageUrl(gym.badge_path || gym.gym_path);
+                  return (
+                    <div
+                      key={`badge-earned-${gym.gym_number}`}
+                      title={`${gym.badge_name} - ${gym.location}`}
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-bg-light)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {badgeSprite ? (
+                        <img
+                          src={badgeSprite}
+                          alt={gym.badge_name || `Gym ${gym.gym_number} badge`}
+                          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '0.65rem', color: 'var(--color-text-secondary)' }}>
+                          {gym.gym_number}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+              Caught Pokemon ({pokedexCount})
+            </div>
+            {allPokemon.length === 0 ? (
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.82rem' }}>
+                No Pokemon caught yet.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '4px',
+                  maxHeight: '164px',
+                  overflowY: 'auto',
+                  paddingRight: '4px',
+                }}
+              >
+                {allPokemon.map((pokemon: any) => (
+                  <div
+                    key={`caught-${pokemon.id}`}
+                    title={pokemon.nickname || pokemon.name}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-bg-light)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <img
+                      src={getPokemonSpritePath(pokemon.name)}
+                      alt={pokemon.nickname || pokemon.name}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        imageRendering: 'pixelated',
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

@@ -112,6 +112,14 @@ function App() {
           }
         />
         <Route
+          path="/trainer"
+          element={
+            <ProtectedRoute>
+              <TrainersPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/trainers"
           element={
             <ProtectedRoute>

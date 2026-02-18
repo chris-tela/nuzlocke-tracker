@@ -494,6 +494,18 @@ def _build_pokemon_map(db: Session) -> dict[str, AllPokemon]:
     return {p.name.lower(): p for p in all_pokemon}
 
 
+_POKEMON_NAME_ALIASES: dict[str, str] = {
+    "mr. mime": "mr-mime",
+    "mr.mime": "mr-mime",
+}
+
+
+def _normalize_pokemon_lookup_name(name: str) -> str:
+    """Normalise trainer JSON pokemon names for DB lookups."""
+    normalized = name.strip().lower()
+    return _POKEMON_NAME_ALIASES.get(normalized, normalized)
+
+
 def _get_version_ids(db: Session, game_names: list[str]) -> list[int]:
     """Return version_ids for the given game names."""
     versions = (
@@ -539,7 +551,8 @@ def _compute_pokemon_stats(
     """
     name = poke_entry["name"]
     level = poke_entry["level"]
-    base = pokemon_map.get(name.lower())
+    lookup_name = _normalize_pokemon_lookup_name(name)
+    base = pokemon_map.get(lookup_name)
 
     extra_fields = {
         "index": poke_entry.get("index"),

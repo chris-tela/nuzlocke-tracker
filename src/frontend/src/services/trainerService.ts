@@ -19,14 +19,6 @@ export const getImportantTrainers = async (
   );
 };
 
-export const getTrainersByRoute = async (
-  routeId: number,
-  starter?: string
-): Promise<Trainer[]> => {
-  const params = starter ? `?starter=${encodeURIComponent(starter)}` : '';
-  return await apiHelpers.get<Trainer[]>(`/api/trainers/by-route/${routeId}${params}`);
-};
-
 export const getTrainerMatchupSynergy = async (
   trainerId: number,
   gameFileId: number

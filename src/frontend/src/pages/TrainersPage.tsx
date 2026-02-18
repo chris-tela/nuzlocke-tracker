@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGameFile } from '../hooks/useGameFile';
 import { useTrainersByGame } from '../hooks/useTrainers';
@@ -34,10 +34,24 @@ export const TrainersPage = () => {
 
   const { data: allTrainers = [], isLoading: isLoadingAll } = useTrainersByGame(gameName, starter);
   const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFileId);
-  const [scopeMode, setScopeMode] = useState<ScopeMode>('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [importanceFilter, setImportanceFilter] = useState<string>(ALL_IMPORTANCE_FILTER);
+  const searchTermFromParams = searchParams.get('search')?.trim() ?? '';
+  const importanceFromParams = searchParams.get('sortBy');
+  const scopeFromParamsRaw = searchParams.get('scope');
+  const scopeFromParams: ScopeMode = scopeFromParamsRaw === 'important' ? 'important' : 'all';
+  const normalizedImportanceFromParams = importanceFromParams?.trim()
+    ? normalizeImportanceReason(importanceFromParams)
+    : ALL_IMPORTANCE_FILTER;
+  const [searchTerm, setSearchTerm] = useState(searchTermFromParams);
+  const [importanceFilter, setImportanceFilter] = useState<string>(normalizedImportanceFromParams);
+  const [scopeMode, setScopeMode] = useState<ScopeMode>(scopeFromParams);
   const [displayedTrainerCount, setDisplayedTrainerCount] = useState(TRAINERS_PER_PAGE);
+
+  useEffect(() => {
+    setSearchTerm(searchTermFromParams);
+    setImportanceFilter(normalizedImportanceFromParams);
+    setScopeMode(scopeFromParams);
+    setDisplayedTrainerCount(TRAINERS_PER_PAGE);
+  }, [searchTermFromParams, normalizedImportanceFromParams, scopeFromParams]);
 
   const sortedTrainers = useMemo(() => {
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });

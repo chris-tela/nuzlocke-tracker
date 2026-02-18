@@ -213,6 +213,7 @@ const BadgeItem = ({
   isCompleted,
   isSelected,
   onClick,
+  compact = false,
 }: {
   gymNumber: string;
   badgeName: string;
@@ -221,7 +222,9 @@ const BadgeItem = ({
   isCompleted: boolean;
   isSelected: boolean;
   onClick: () => void;
+  compact?: boolean;
 }) => {
+  const badgeSize = compact ? '48px' : '56px';
   return (
     <div
       onClick={onClick}
@@ -229,14 +232,14 @@ const BadgeItem = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '8px',
+        gap: compact ? '6px' : '10px',
         cursor: 'pointer',
-        padding: '12px',
+        padding: compact ? '10px 8px' : '14px',
         borderRadius: '12px',
-        border: isSelected
-          ? '2px solid var(--color-pokemon-primary)'
-          : isCompleted
-            ? '2px solid var(--color-pokemon-green)'
+        border: isCompleted
+          ? '2px solid var(--color-pokemon-green)'
+          : isSelected
+            ? '2px solid var(--color-pokemon-primary)'
             : '1px solid var(--color-border)',
         backgroundColor: isSelected
           ? 'var(--color-bg-light)'
@@ -244,9 +247,14 @@ const BadgeItem = ({
             ? 'var(--color-bg-card)'
             : 'var(--color-bg-light)',
         transition: 'all 150ms ease',
-        minWidth: '100px',
+        minWidth: compact ? '0' : '120px',
+        width: compact ? '100%' : 'auto',
         opacity: isCompleted || isSelected ? 1 : 0.6,
-        boxShadow: isSelected ? '0 0 8px rgba(79, 70, 229, 0.5)' : 'none',
+        boxShadow: isSelected
+          ? isCompleted
+            ? '0 0 8px rgba(34, 197, 94, 0.45)'
+            : '0 0 8px rgba(79, 70, 229, 0.5)'
+          : 'none',
       }}
       onMouseEnter={(e) => {
         if (!isSelected) {
@@ -270,8 +278,8 @@ const BadgeItem = ({
       {/* Badge Image */}
       <div
         style={{
-          width: '56px',
-          height: '56px',
+          width: badgeSize,
+          height: badgeSize,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -287,8 +295,8 @@ const BadgeItem = ({
         ) : (
           <div
             style={{
-              width: '56px',
-              height: '56px',
+              width: badgeSize,
+              height: badgeSize,
               borderRadius: '50%',
               backgroundColor: isCompleted
                 ? 'var(--color-pokemon-green)'
@@ -297,7 +305,7 @@ const BadgeItem = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '1.5rem',
+              fontSize: compact ? '1.2rem' : '1.5rem',
               fontWeight: 'bold',
               color: isCompleted ? 'var(--color-text-white)' : 'var(--color-text-secondary)',
             }}
@@ -309,14 +317,14 @@ const BadgeItem = ({
       <div
         style={{
           textAlign: 'center',
-          fontSize: '0.75rem',
+          fontSize: compact ? '0.7rem' : '0.75rem',
           color: isCompleted ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
           fontWeight: isSelected ? 600 : 400,
           lineHeight: '1.3',
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: '2px' }}>{badgeName}</div>
-        <div style={{ fontSize: '0.7rem', opacity: 0.8 }}>{location}</div>
+        <div style={{ fontSize: compact ? '0.65rem' : '0.7rem', opacity: 0.8 }}>{location}</div>
       </div>
     </div>
   );
@@ -326,6 +334,9 @@ export const GymsPage = () => {
   const navigate = useNavigate();
   const { currentGameFile } = useGameFile();
   const gameFileId = currentGameFile?.id ?? null;
+  const [viewportWidth, setViewportWidth] = useState<number>(
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
 
   const { data: gymProgress = [], isLoading: isLoadingProgress } = useGymProgress(gameFileId);
   const { data: upcomingGymsResponse, isLoading: isLoadingUpcoming } = useUpcomingGyms(gameFileId);
@@ -337,22 +348,39 @@ export const GymsPage = () => {
   const upcomingGyms: GymData[] = (upcomingGymsResponse?.upcoming_gyms || []).map((gym: any) => ({
     ...gym,
     gym_number: String(gym.gym_number), // Normalize to string for consistency
-  }));
+  }))
+  .filter((gym) => {
+    const gymNumber = Number.parseInt(gym.gym_number, 10);
+    return Number.isFinite(gymNumber) && gymNumber >= 1 && gymNumber <= 8;
+  });
+
+  const completedGymNumbers = new Set(
+    gymProgress
+      .map((gym: any) => Number.parseInt(String(gym.gym_number), 10))
+      .filter((gymNumber) => Number.isFinite(gymNumber) && gymNumber >= 1 && gymNumber <= 8)
+  );
+  const completedGymCount = completedGymNumbers.size;
+  const hasCompletedAllGyms = completedGymCount >= 8;
 
   // Get all gyms (from version, merged with progress data) for display
   const allGyms: GymData[] = useMemo(() => {
     // Start with all version gyms (1-8) to ensure we have complete data
-    const versionGymsData: GymData[] = (versionGyms as any[]).map((gym: any) => ({
-      gym_number: String(gym.gym_number),
-      gym_path: gym.gym_path,
-      badge_path: gym.badge_path,
-      location: gym.location || '',
-      badge_name: gym.badge_name || '',
-      trainer_name: gym.trainer_name,
-      trainer_image: gym.trainer_image,
-      badge_type: gym.badge_type,
-      pokemon: gym.pokemon,
-    }));
+    const versionGymsData: GymData[] = (versionGyms as any[])
+      .map((gym: any) => ({
+        gym_number: String(gym.gym_number),
+        gym_path: gym.gym_path,
+        badge_path: gym.badge_path,
+        location: gym.location || '',
+        badge_name: gym.badge_name || '',
+        trainer_name: gym.trainer_name,
+        trainer_image: gym.trainer_image,
+        badge_type: gym.badge_type,
+        pokemon: gym.pokemon,
+      }))
+      .filter((gym) => {
+        const gymNumber = Number.parseInt(gym.gym_number, 10);
+        return Number.isFinite(gymNumber) && gymNumber >= 1 && gymNumber <= 8;
+      });
 
     // Create a map for quick lookup
     const gymsMap = new Map<string, GymData>();
@@ -383,11 +411,11 @@ export const GymsPage = () => {
 
   // Find the next gym that can be marked as completed
   const nextGymToComplete = useMemo(() => {
-    const completedCount = gymProgress.length;
+    const completedCount = completedGymCount;
     if (completedCount >= 8) return null;
     const nextGymNum = completedCount + 1;
     return upcomingGyms.find(gym => parseInt(gym.gym_number, 10) === nextGymNum) || null;
-  }, [gymProgress, upcomingGyms]);
+  }, [completedGymCount, upcomingGyms]);
 
   const [selectedGymNumber, setSelectedGymNumber] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -396,12 +424,17 @@ export const GymsPage = () => {
   // Select first upcoming gym by default, or first gym if none upcoming
   useEffect(() => {
     if (!selectedGymNumber && allGyms.length > 0) {
-      const firstUpcoming = allGyms.find(gym => 
-        !gymProgress.some((completed: any) => String(completed.gym_number) === gym.gym_number)
-      ) || allGyms[0];
+      if (hasCompletedAllGyms) {
+        setSelectedGymNumber('8');
+        return;
+      }
+      const firstUpcoming = allGyms.find((gym) => {
+        const gymNumber = Number.parseInt(gym.gym_number, 10);
+        return Number.isFinite(gymNumber) && !completedGymNumbers.has(gymNumber);
+      }) || allGyms[0];
       setSelectedGymNumber(firstUpcoming.gym_number);
     }
-  }, [allGyms, gymProgress, selectedGymNumber]);
+  }, [allGyms, hasCompletedAllGyms, completedGymNumbers, selectedGymNumber]);
 
   useEffect(() => {
     if (!currentGameFile) {
@@ -417,8 +450,21 @@ export const GymsPage = () => {
 
   const selectedGym = allGyms.find(gym => gym.gym_number === selectedGymNumber);
   const isSelectedGymCompleted = selectedGym 
-    ? gymProgress.some((gym: any) => String(gym.gym_number) === selectedGym.gym_number)
+    ? completedGymNumbers.has(Number.parseInt(String(selectedGym.gym_number), 10))
     : false;
+  const canMarkSelectedGymCompleted =
+    !isSelectedGymCompleted &&
+    !!nextGymToComplete &&
+    !!selectedGym &&
+    selectedGym.gym_number === nextGymToComplete.gym_number;
+  const isMobile = viewportWidth <= 768;
+  const isSmallMobile = viewportWidth <= 480;
+
+  useEffect(() => {
+    const handleResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleMarkGymCompleted = async () => {
     if (!nextGymToComplete) {
@@ -452,7 +498,7 @@ export const GymsPage = () => {
       style={{
         minHeight: '100vh',
         backgroundColor: 'var(--color-bg-light)',
-        padding: '40px 20px',
+        padding: isMobile ? '20px 12px' : '40px 20px',
       }}
     >
       <div
@@ -461,7 +507,7 @@ export const GymsPage = () => {
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '24px',
+          gap: isMobile ? '16px' : '24px',
         }}
       >
         {/* Header */}
@@ -469,13 +515,15 @@ export const GymsPage = () => {
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'stretch' : 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? '10px' : '0',
           }}
         >
           <h1
             style={{
               color: 'var(--color-text-primary)',
-              fontSize: '1.8rem',
+              fontSize: isMobile ? '1.45rem' : '1.8rem',
               margin: 0,
             }}
           >
@@ -484,20 +532,24 @@ export const GymsPage = () => {
           <button
             className="btn btn-outline"
             onClick={() => navigate(`/dashboard?gameFileId=${gameFileId}`)}
-            style={{ fontSize: '0.9rem', padding: '8px 16px' }}
+            style={{
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              padding: isMobile ? '10px 14px' : '8px 16px',
+              width: isMobile ? '100%' : 'auto',
+            }}
           >
             {'<-'} Back to Dashboard
           </button>
         </div>
 
         {/* Badge Timeline */}
-        <div className="card" style={{ padding: '24px' }}>
+        <div className="card" style={{ padding: isMobile ? '16px' : '24px' }}>
           <h2
             style={{
               color: 'var(--color-text-primary)',
-              fontSize: '1.5rem',
+              fontSize: isMobile ? '1.2rem' : '1.5rem',
               marginTop: 0,
-              marginBottom: '20px',
+              marginBottom: isMobile ? '14px' : '20px',
               fontWeight: 600,
             }}
           >
@@ -509,7 +561,7 @@ export const GymsPage = () => {
             <div
               style={{
                 display: 'flex',
-                gap: '12px',
+                gap: isMobile ? '8px' : '12px',
                 justifyContent: 'flex-start',
                 overflowX: 'auto',
                 paddingBottom: '8px',
@@ -519,7 +571,7 @@ export const GymsPage = () => {
               {Array.from({ length: 8 }, (_, i) => {
                 const gymNumber = String(i + 1);
                 const gym = allGyms.find(g => g.gym_number === gymNumber);
-                const isCompleted = gymProgress.some((g: any) => String(g.gym_number) === gymNumber);
+                const isCompleted = completedGymNumbers.has(i + 1);
                 
                 if (!gym) {
                   // Gym not yet loaded/available
@@ -554,15 +606,58 @@ export const GymsPage = () => {
           )}
         </div>
 
-        {/* Gym Detail Panel */}
-        {selectedGym && (
-          <div className="card" style={{ padding: '24px' }}>
+        {/* Completed State */}
+        {hasCompletedAllGyms && (
+          <div className="card" style={{ padding: isMobile ? '16px' : '24px' }}>
             <h2
               style={{
                 color: 'var(--color-text-primary)',
-                fontSize: '1.5rem',
+                fontSize: isMobile ? '1.25rem' : '1.55rem',
                 marginTop: 0,
-                marginBottom: '16px',
+                marginBottom: '12px',
+                fontWeight: 700,
+              }}
+            >
+              Gym Challenge Completed
+            </h2>
+            <p
+              style={{
+                color: 'var(--color-text-secondary)',
+                marginTop: 0,
+                marginBottom: '18px',
+                fontSize: isMobile ? '0.92rem' : '0.96rem',
+              }}
+            >
+              You have earned all 8 badges. Next up: prepare for the Elite Four.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() =>
+                navigate(
+                  `/trainers?gameName=${encodeURIComponent(currentGameFile.game_name)}&sortBy=${encodeURIComponent('elite four')}&scope=important`
+                )
+              }
+              style={{
+                fontSize: isMobile ? '0.9rem' : '0.95rem',
+                padding: isMobile ? '12px 16px' : '10px 18px',
+                width: isMobile ? '100%' : 'auto',
+              }}
+            >
+              View Elite Four Trainers
+            </button>
+          </div>
+        )}
+
+        {/* Gym Detail Panel */}
+        {selectedGym ? (
+          <div className="card" style={{ padding: isMobile ? '16px' : '24px' }}>
+            <h2
+              style={{
+                color: 'var(--color-text-primary)',
+                fontSize: isMobile ? '1.2rem' : '1.5rem',
+                marginTop: 0,
+                marginBottom: isMobile ? '12px' : '16px',
                 fontWeight: 600,
               }}
             >
@@ -572,9 +667,9 @@ export const GymsPage = () => {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'minmax(200px, 1fr) 2fr',
-                gap: '24px',
-                marginBottom: '24px',
+                gridTemplateColumns: isMobile ? '1fr' : 'minmax(200px, 1fr) 2fr',
+                gap: isMobile ? '16px' : '24px',
+                marginBottom: isMobile ? '16px' : '24px',
               }}
             >
               {/* Gym Info */}
@@ -644,8 +739,8 @@ export const GymsPage = () => {
                     {resolveTrainerSpriteUrl(selectedGym.trainer_image) && (
                       <div
                         style={{
-                          width: '120px',
-                          height: '120px',
+                          width: isSmallMobile ? '96px' : '120px',
+                          height: isSmallMobile ? '96px' : '120px',
                           borderRadius: '8px',
                           backgroundColor: 'var(--color-bg-card)',
                           display: 'flex',
@@ -728,9 +823,9 @@ export const GymsPage = () => {
                 <h3
                   style={{
                     color: 'var(--color-text-primary)',
-                    fontSize: '1.1rem',
+                    fontSize: isMobile ? '1rem' : '1.1rem',
                     marginTop: 0,
-                    marginBottom: '16px',
+                    marginBottom: isMobile ? '12px' : '16px',
                     fontWeight: 600,
                   }}
                 >
@@ -740,8 +835,8 @@ export const GymsPage = () => {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                      gap: '12px',
+                      gridTemplateColumns: `repeat(auto-fit, minmax(${isSmallMobile ? 120 : 140}px, 1fr))`,
+                      gap: isMobile ? '10px' : '12px',
                     }}
                   >
                     {selectedGym.pokemon.map((poke: any, index: number) => {
@@ -752,7 +847,7 @@ export const GymsPage = () => {
                         <div
                           key={index}
                           style={{
-                            padding: '14px',
+                            padding: isMobile ? '10px' : '14px',
                             borderRadius: '10px',
                             border: '1px solid var(--color-border)',
                             backgroundColor: 'var(--color-bg-card)',
@@ -762,7 +857,7 @@ export const GymsPage = () => {
                             gap: '10px',
                           }}
                         >
-                          <PokemonSprite pokemonName={pokemonName} size={72} />
+                          <PokemonSprite pokemonName={pokemonName} size={isSmallMobile ? 60 : 72} />
                           <div
                             style={{
                               textAlign: 'center',
@@ -816,23 +911,58 @@ export const GymsPage = () => {
               </div>
             </div>
 
-            {/* Mark Next Gym Completed Button */}
-            {!isSelectedGymCompleted && 
-             nextGymToComplete && 
-             selectedGym.gym_number === nextGymToComplete.gym_number && (
-              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+            {/* Bottom Action Row */}
+            {(canMarkSelectedGymCompleted || !!selectedGym.trainer_name) && (
+              <div
+                style={{
+                  marginTop: '16px',
+                  paddingTop: '16px',
+                  borderTop: '1px solid var(--color-border)',
+                  display: 'flex',
+                  alignItems: isMobile ? 'stretch' : 'center',
+                  justifyContent: 'flex-start',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: '12px',
+                  flexWrap: isMobile ? 'nowrap' : 'wrap',
+                }}
+              >
+                {canMarkSelectedGymCompleted ? (
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={() => setShowConfirmModal(true)}
-                  style={{ fontSize: '0.9rem', padding: '10px 20px' }}
+                  style={{
+                    fontSize: isMobile ? '0.9rem' : '0.9rem',
+                    padding: isMobile ? '12px 16px' : '10px 20px',
+                    width: isMobile ? '100%' : 'auto',
+                  }}
                 >
                   Mark Gym {selectedGym.gym_number} Completed
                 </button>
+                ) : null}
+                {selectedGym.trainer_name && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() =>
+                    navigate(
+                      `/trainer?search=${encodeURIComponent(selectedGym.trainer_name!)}&sortBy=${encodeURIComponent('gym leader')}`
+                    )
+                  }
+                  style={{
+                    fontSize: isMobile ? '0.9rem' : '0.95rem',
+                    padding: isMobile ? '12px 16px' : '10px 18px',
+                    marginLeft: isMobile ? 0 : 'auto',
+                    width: isMobile ? '100%' : 'auto',
+                  }}
+                >
+                  SEE FULL TRAINER DETAILS
+                </button>
+                )}
               </div>
             )}
           </div>
-        )}
+        ) : null}
 
         {/* Error Display */}
         {error && (
@@ -869,8 +999,8 @@ export const GymsPage = () => {
             className="card"
             style={{
               width: '100%',
-              maxWidth: '480px',
-              padding: '24px',
+              maxWidth: isMobile ? 'calc(100vw - 24px)' : '480px',
+              padding: isMobile ? '16px' : '24px',
             }}
             onClick={(e) => e.stopPropagation()}
           >

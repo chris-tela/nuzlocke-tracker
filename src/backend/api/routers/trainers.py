@@ -228,27 +228,6 @@ async def get_trainer_matchup_synergy(
     return {"score_percent": result["score_percent"]}
 
 
-@router.get("/by-route/{route_id}", response_model=list[TrainerResponse])
-async def get_trainers_by_route(
-    route_id: int,
-    starter: Optional[str] = None,
-    db: Session = Depends(get_db),
-):
-    """Get all trainers matched to a specific route."""
-    query = db.query(models.Trainer).filter(
-        models.Trainer.route_id == route_id
-    ).order_by(asc(models.Trainer.battle_order))
-
-    if starter:
-        query = query.filter(
-            (models.Trainer.starter_filter == None) |  # noqa: E711
-            (func.lower(models.Trainer.starter_filter) == starter.lower())
-        )
-
-    trainers = query.all()
-    return _hydrate_trainer_pokemon_types(trainers, db)
-
-
 @router.get("/{game_name}/important", response_model=list[TrainerResponse])
 async def get_important_trainers(
     game_name: str,

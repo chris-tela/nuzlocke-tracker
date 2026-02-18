@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getTrainersByGame,
   getImportantTrainers,
-  getTrainersByRoute,
 } from '../services/trainerService';
 import { queryKeys } from './queryKeys';
 
@@ -23,15 +22,5 @@ export const useImportantTrainers = (gameName: string | null, starter?: string) 
       : ['trainers', 'important', 'disabled'],
     queryFn: () => getImportantTrainers(gameName!, starter),
     enabled: !!gameName,
-  });
-};
-
-export const useTrainersByRoute = (routeId: number | null, starter?: string) => {
-  return useQuery({
-    queryKey: routeId != null
-      ? queryKeys.trainersByRoute(routeId, starter)
-      : ['trainers', 'route', 'disabled'],
-    queryFn: () => getTrainersByRoute(routeId!, starter),
-    enabled: routeId != null,
   });
 };
