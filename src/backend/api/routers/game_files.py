@@ -7,16 +7,9 @@ from sqlalchemy.orm import Session
 from ...db import models
 from ..dependencies import get_db, get_current_user
 from ..schemas import GameFileCreate, GameFileResponse, GameFileUpdate
+from ..utils import to_game_file_response
 
 router = APIRouter()
-
-
-def _to_game_file_response(game_file: models.GameFiles) -> GameFileResponse:
-    """Map legacy DB column starter_selected to starter_pokemon response field."""
-    response = GameFileResponse.model_validate(game_file)
-    if response.starter_pokemon is None:
-        response.starter_pokemon = game_file.starter_selected
-    return response
 
 @router.post("", response_model=GameFileResponse, status_code=status.HTTP_201_CREATED)
 async def create_game_file(
@@ -55,7 +48,7 @@ async def create_game_file(
     db.commit()
     db.refresh(new_game_file)
     
-    return _to_game_file_response(new_game_file)
+    return to_game_file_response(new_game_file)
 
 # get list of game files for a given user
 @router.get("", response_model = list[GameFileResponse], status_code = status.HTTP_200_OK)
@@ -70,7 +63,7 @@ async def get_game_files(
     if game_files is None:
         raise HTTPException(404, "No game files associated with user!")
     # return list of game files
-    return [_to_game_file_response(gf) for gf in game_files]
+    return [to_game_file_response(gf) for gf in game_files]
 
 # get game file 
 @router.get("/{game_file_id}", response_model = GameFileResponse, status_code = status.HTTP_200_OK)
@@ -85,7 +78,7 @@ async def get_game_file(game_file_id: int, user: models.User = Depends(get_curre
     if game_file.user_id is not user.id:
         raise HTTPException(403, "Game File ID not associated with User's account!")
     
-    return _to_game_file_response(game_file)
+    return to_game_file_response(game_file)
         
 
 @router.put("/{game_file_id}", response_model=GameFileResponse, status_code=status.HTTP_200_OK)
@@ -109,7 +102,7 @@ async def update_game_file(
         game_file.starter_selected = update.starter_pokemon.strip() or None
     db.commit()
     db.refresh(game_file)
-    return _to_game_file_response(game_file)
+    return to_game_file_response(game_file)
 
 
 @router.delete("/{game_file_id}")

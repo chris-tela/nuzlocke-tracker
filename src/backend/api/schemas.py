@@ -249,3 +249,29 @@ class TokenData(BaseModel):
     user_id: Optional[int] = None
     username: Optional[str] = None
 
+# Save File Import Schemas
+class ParsedPokemonPreview(BaseModel):
+    poke_id: int
+    name: str
+    nickname: Optional[str] = None
+    nature: Optional[str] = None
+    ability: Optional[str] = None
+    level: int = Field(ge=1, le=100)
+    status: str  # "Party" or "Stored"
+    caught_on: Optional[str] = None
+
+class ParsedSavePreview(BaseModel):
+    generation: int
+    game: str
+    compatible_versions: List[str]
+    trainer_name: str
+    badges: List[str] = []
+    pokemon: List[ParsedPokemonPreview]
+
+class CreateFromSaveRequest(BaseModel):
+    parsed_preview: ParsedSavePreview
+    game_name: str
+
+class UpdateFromSaveRequest(BaseModel):
+    parsed_preview: ParsedSavePreview
+

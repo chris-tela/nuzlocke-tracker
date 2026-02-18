@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import routers (package-relative imports)
-from .routers import auth, users, game_files, pokemon, routes, gyms, versions, trainers
+from .routers import auth, users, game_files, pokemon, routes, gyms, versions, trainers, save_import
 
 app = FastAPI(
     title="Nuzlocke Tracker API",
@@ -88,6 +88,7 @@ if os.path.exists(data_badges_path):
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(game_files.router, prefix="/api/game-files", tags=["game-files"])
+app.include_router(save_import.router, prefix="/api/game-files", tags=["save-import"])
 app.include_router(pokemon.router, prefix="/api/pokemon", tags=["pokemon"])
 app.include_router(routes.router, prefix="/api/routes", tags=["routes"])
 app.include_router(gyms.router, prefix="/api/gyms", tags=["gyms"])

@@ -2,7 +2,7 @@
  * Game Files Page
  * Displays game files in a Pokemon-style save screen format
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useGameFile } from '../hooks/useGameFile';
@@ -11,7 +11,12 @@ import { useGymProgress } from '../hooks/useGyms';
 import { usePokemon } from '../hooks/usePokemon';
 import { useVersions } from '../hooks/useVersions';
 import { getGameFiles, deleteGameFile } from '../services/gameFileService';
+import { parseSaveFile, createGameFileFromSave, updateGameFileFromSave } from '../services/saveFileService';
+import { SaveFileUpload } from '../components/SaveFileUpload';
+import { SavePreviewModal } from '../components/SavePreviewModal';
 import { getPokemonSpritePath } from '../utils/pokemonSprites';
+import { formatGameName } from '../utils/formatGameName';
+import type { ParsedSavePreview, Pokemon } from '../types';
 
 export const GameFilesPage = () => {
   const navigate = useNavigate();
@@ -23,6 +28,21 @@ export const GameFilesPage = () => {
   const [selectedGame, setSelectedGame] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Save import state
+  const [showImportForm, setShowImportForm] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<ParsedSavePreview | null>(null);
+  const [importConfirmLoading, setImportConfirmLoading] = useState(false);
+
+  // Update from save state
+  const [updateGameFileId, setUpdateGameFileId] = useState<number | null>(null);
+  const [updatePreview, setUpdatePreview] = useState<ParsedSavePreview | null>(null);
+  const [updateExistingPokemon, setUpdateExistingPokemon] = useState<Pokemon[]>([]);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateConfirmLoading, setUpdateConfirmLoading] = useState(false);
 
   // Load game files on mount
   useEffect(() => {
@@ -87,6 +107,86 @@ export const GameFilesPage = () => {
     }
   };
 
+  const handleImportFileSelected = async (file: File) => {
+    setImportError(null);
+    setImportLoading(true);
+    try {
+      const preview = await parseSaveFile(file);
+      setImportPreview(preview);
+    } catch (err: any) {
+      setImportError(err?.response?.data?.detail || 'Failed to parse save file');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleImportConfirm = async (gameName?: string) => {
+    if (!importPreview || !gameName) return;
+    setImportConfirmLoading(true);
+    try {
+      await createGameFileFromSave(importPreview, gameName);
+      const files = await getGameFiles();
+      setGameFiles(files);
+      setImportPreview(null);
+      setShowImportForm(false);
+    } catch (err: any) {
+      setImportError(err?.response?.data?.detail || 'Failed to create game file from save');
+    } finally {
+      setImportConfirmLoading(false);
+    }
+  };
+
+  const handleImportCancel = () => {
+    setImportPreview(null);
+    setImportError(null);
+  };
+
+  const handleUpdateFileSelected = async (file: File, gameFileId: number, existingPokemon: Pokemon[]) => {
+    setUpdateError(null);
+    setUpdateGameFileId(gameFileId);
+    setUpdateExistingPokemon(existingPokemon);
+    setUpdateLoading(true);
+    try {
+      const preview = await parseSaveFile(file);
+      // Client-side game mismatch pre-check
+      const targetGameFile = gameFiles.find(gf => gf.id === gameFileId);
+      if (targetGameFile && !preview.compatible_versions.includes(targetGameFile.game_name)) {
+        setUpdateError(
+          `This save is from ${preview.game} but this game file is ${formatGameName(targetGameFile.game_name)}.`
+        );
+        setUpdateLoading(false);
+        return;
+      }
+      setUpdatePreview(preview);
+    } catch (err: any) {
+      setUpdateError(err?.response?.data?.detail || 'Failed to parse save file');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleUpdateConfirm = async () => {
+    if (!updatePreview || !updateGameFileId) return;
+    setUpdateConfirmLoading(true);
+    try {
+      await updateGameFileFromSave(updateGameFileId, updatePreview);
+      const files = await getGameFiles();
+      setGameFiles(files);
+      setUpdatePreview(null);
+      setUpdateGameFileId(null);
+    } catch (err: any) {
+      setUpdateError(err?.response?.data?.detail || 'Failed to update game file from save');
+    } finally {
+      setUpdateConfirmLoading(false);
+    }
+  };
+
+  const handleUpdateCancel = () => {
+    setUpdatePreview(null);
+    setUpdateGameFileId(null);
+    setUpdateError(null);
+  };
+
   const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -136,7 +236,14 @@ export const GameFilesPage = () => {
             </button>
           )}
           <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
+            onClick={() => { setShowImportForm(!showImportForm); setShowCreateForm(false); }}
+            className="btn btn-primary"
+            style={{ fontSize: '14px', padding: '8px 16px' }}
+          >
+            {showImportForm ? 'Cancel Import' : 'Import Save'}
+          </button>
+          <button
+            onClick={() => { setShowCreateForm(!showCreateForm); setShowImportForm(false); }}
             className="btn btn-primary"
             style={{ fontSize: '14px', padding: '8px 16px' }}
           >
@@ -334,6 +441,28 @@ export const GameFilesPage = () => {
         </div>
       )}
 
+      {/* Import Save File Form */}
+      {showImportForm && (
+        <div className="card" style={{
+          maxWidth: '900px',
+          width: '100%',
+          padding: '28px',
+        }}>
+          <h2 style={{
+            color: 'var(--color-text-primary)',
+            fontSize: '1.5rem',
+            marginBottom: '20px',
+          }}>
+            Import from Save File
+          </h2>
+          <SaveFileUpload
+            onFileSelected={handleImportFileSelected}
+            isLoading={importLoading}
+            error={importError}
+          />
+        </div>
+      )}
+
       {/* Game Files List - Only show when not creating new game */}
       {!showCreateForm && (
         <>
@@ -366,6 +495,9 @@ export const GameFilesPage = () => {
                     navigate(`/dashboard?gameFileId=${gameFile.id}`);
                   }}
                   onDelete={() => handleDeleteGameFile(gameFile.id)}
+                  onUpdateFromSave={handleUpdateFileSelected}
+                  updateLoading={updateLoading && updateGameFileId === gameFile.id}
+                  updateError={updateGameFileId === gameFile.id ? updateError : null}
                 />
               ))}
             </div>
@@ -384,6 +516,29 @@ export const GameFilesPage = () => {
           Last saved on {formatDate(currentGameFile.created_at)}
         </div>
       )}
+
+      {/* Import preview modal */}
+      {importPreview && (
+        <SavePreviewModal
+          preview={importPreview}
+          mode="create"
+          onConfirm={handleImportConfirm}
+          onCancel={handleImportCancel}
+          isLoading={importConfirmLoading}
+        />
+      )}
+
+      {/* Update preview modal */}
+      {updatePreview && (
+        <SavePreviewModal
+          preview={updatePreview}
+          mode="update"
+          existingPokemon={updateExistingPokemon}
+          onConfirm={handleUpdateConfirm}
+          onCancel={handleUpdateCancel}
+          isLoading={updateConfirmLoading}
+        />
+      )}
     </div>
   );
 };
@@ -393,6 +548,9 @@ interface GameFileCardProps {
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onUpdateFromSave: (file: File, gameFileId: number, existingPokemon: Pokemon[]) => void;
+  updateLoading?: boolean;
+  updateError?: string | null;
 }
 
 // Hardcoded mapping of game names to image filenames
@@ -419,15 +577,8 @@ const GAME_IMAGE_MAP: Record<string, string> = {
   'soulsilver': 'soulsilver.jpg',
 };
 
-// Capitalize game name (e.g., "black-2" -> "Black-2")
-const formatGameName = (name: string): string => {
-  return name
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join('-');
-};
-
-const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCardProps) => {
+const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete, onUpdateFromSave, updateLoading, updateError }: GameFileCardProps) => {
+  const updateFileRef = useRef<HTMLInputElement>(null);
   const { data: partyPokemon = [], isLoading: isLoadingParty } = usePartyPokemon(gameFile.id);
   const { data: gymProgress = [], isLoading: isLoadingGyms } = useGymProgress(gameFile.id);
   const { data: allPokemon = [], isLoading: isLoadingPokemon } = usePokemon(gameFile.id);
@@ -621,11 +772,27 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
         )}
       </div>
 
+      {/* Hidden file input for save update */}
+      <input
+        ref={updateFileRef}
+        type="file"
+        accept=".sav"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            onUpdateFromSave(file, gameFile.id, allPokemon);
+            e.target.value = '';
+          }
+        }}
+      />
+
       {/* Action Buttons */}
       <div style={{
         display: 'flex',
         gap: '12px',
         justifyContent: 'center',
+        flexWrap: 'wrap',
       }}>
         <button
           onClick={(e) => {
@@ -635,7 +802,7 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
           className="btn btn-primary"
           style={{
             flex: 1,
-            maxWidth: '200px',
+            maxWidth: '160px',
             backgroundColor: isSelected ? 'var(--color-pokemon-yellow)' : 'var(--color-pokemon-primary)',
             borderColor: isSelected ? '#D4AF37' : '#4338CA',
             color: isSelected ? '#1A1A1A' : 'var(--color-text-white)',
@@ -646,17 +813,44 @@ const GameFileCard = ({ gameFile, isSelected, onSelect, onDelete }: GameFileCard
         <button
           onClick={(e) => {
             e.stopPropagation();
+            updateFileRef.current?.click();
+          }}
+          className="btn btn-outline"
+          disabled={updateLoading}
+          style={{
+            flex: 1,
+            maxWidth: '160px',
+          }}
+        >
+          {updateLoading ? 'Parsing...' : 'Update Save'}
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
             onDelete();
           }}
           className="btn btn-outline-danger"
           style={{
             flex: 1,
-            maxWidth: '200px',
+            maxWidth: '160px',
           }}
         >
           Delete
         </button>
       </div>
+      {updateError && (
+        <div style={{
+          marginTop: '12px',
+          padding: '8px',
+          backgroundColor: '#FEE2E2',
+          border: '1px solid #F87171',
+          borderRadius: '8px',
+          color: '#991B1B',
+          fontSize: '12px',
+        }}>
+          {updateError}
+        </div>
+      )}
     </div>
   );
 };
