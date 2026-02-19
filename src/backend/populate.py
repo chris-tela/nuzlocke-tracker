@@ -654,7 +654,3 @@ def populate_moves(db: Session = Depends(database.get_db)):
     return {"message": "Moves populated successfully!"}
 
 
-
-
-
-

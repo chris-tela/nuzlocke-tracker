@@ -53,6 +53,7 @@ class GameFileResponse(GameFileBase):
     gym_progress: Optional[List[Dict[str, Any]]] = None
     route_progress: Optional[List[str]] = None
     created_at: Optional[datetime] = None
+    last_accessed: Optional[datetime] = None
 
     class Config:
         from_attributes = True

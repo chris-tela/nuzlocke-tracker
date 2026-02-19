@@ -44,6 +44,13 @@ export const updateGameFile = async (
 };
 
 /**
+ * Record that the user accessed a game file (for sorting by recency)
+ */
+export const accessGameFile = async (gameFileId: number): Promise<void> => {
+  await apiHelpers.patch(`/api/game-files/${gameFileId}/access`);
+};
+
+/**
  * Delete a game file
  */
 export const deleteGameFile = async (gameFileId: number): Promise<void> => {

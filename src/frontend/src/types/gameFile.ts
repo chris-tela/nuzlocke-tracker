@@ -9,6 +9,7 @@ export interface GameFile {
   gym_progress?: GymProgressEntry[] | null;
   route_progress?: string[] | null;
   created_at?: string | null;
+  last_accessed?: string | null;
 }
 
 export interface GymProgressEntry {

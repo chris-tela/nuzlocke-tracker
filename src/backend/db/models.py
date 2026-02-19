@@ -121,9 +121,8 @@ class GameFiles(Base):
     owned_pokemon = relationship("OwnedPokemon", back_populates="game_file", cascade="all, delete")
     gym_progress = Column(ARRAY(JSON), nullable=True)
     route_progress = Column(ARRAY(JSON), nullable=True)
+    last_accessed = Column(TIMESTAMP(timezone=True), nullable=True, server_default=text('now()'))
     user = relationship("User", back_populates="game_files")
-
-    # TODO: Last save
 
 class Generation(Base):
     __tablename__ = "generation"

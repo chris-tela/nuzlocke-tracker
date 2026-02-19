@@ -2,12 +2,13 @@
 Game file management router.
 Handles game file CRUD operations.
 """
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from ...db import models
 from ..dependencies import get_db, get_current_user
 from ..schemas import GameFileCreate, GameFileResponse, GameFileUpdate
-from ..utils import to_game_file_response
+from ..utils import verify_game_file, to_game_file_response
 
 router = APIRouter()
 
@@ -57,8 +58,13 @@ async def get_game_files(
     db: Session = Depends(get_db)
 ):
     
-    # get current users list of game files
-    game_files = db.query(models.GameFiles).filter(models.GameFiles.user_id == user.id).all()
+    # get current users list of game files, most recently accessed first
+    game_files = (
+        db.query(models.GameFiles)
+        .filter(models.GameFiles.user_id == user.id)
+        .order_by(models.GameFiles.last_accessed.desc().nulls_last(), models.GameFiles.id.desc())
+        .all()
+    )
 
     if game_files is None:
         raise HTTPException(404, "No game files associated with user!")
@@ -103,6 +109,18 @@ async def update_game_file(
     db.commit()
     db.refresh(game_file)
     return to_game_file_response(game_file)
+
+
+@router.patch("/{game_file_id}/access", status_code=status.HTTP_204_NO_CONTENT)
+async def access_game_file(
+    game_file_id: int,
+    user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Record that the user accessed this game file."""
+    game_file = verify_game_file(game_file_id, user, db)
+    game_file.last_accessed = datetime.now(timezone.utc)
+    db.commit()
 
 
 @router.delete("/{game_file_id}")

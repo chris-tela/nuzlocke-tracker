@@ -10,7 +10,7 @@ import { usePartyPokemon } from '../hooks/usePokemon';
 import { useGymProgress } from '../hooks/useGyms';
 import { usePokemon } from '../hooks/usePokemon';
 import { useVersions } from '../hooks/useVersions';
-import { getGameFiles, deleteGameFile } from '../services/gameFileService';
+import { getGameFiles, deleteGameFile, accessGameFile } from '../services/gameFileService';
 import { parseSaveFile, createGameFileFromSave, updateGameFileFromSave } from '../services/saveFileService';
 import { SaveFileUpload } from '../components/SaveFileUpload';
 import { SavePreviewModal } from '../components/SavePreviewModal';
@@ -492,6 +492,7 @@ export const GameFilesPage = () => {
                   isSelected={currentGameFile?.id === gameFile.id}
                   onSelect={() => {
                     setCurrentGameFile(gameFile);
+                    accessGameFile(gameFile.id).catch((err) => console.error('Failed to record access:', err));
                     navigate(`/dashboard?gameFileId=${gameFile.id}`);
                   }}
                   onDelete={() => handleDeleteGameFile(gameFile.id)}
