@@ -87,6 +87,7 @@ _HGSS_PARTY_OFFSET = 0x94
 
 # PC storage offset within big block
 _PC_OFFSET = 0x04
+_HGSS_PC_OFFSET = 0x88
 
 # Trainer name offsets in small block
 _DP_TRAINER_NAME_OFFSET = 0x64
@@ -541,11 +542,11 @@ class Gen4Parser(BaseParser):
         """
         boxes: dict[str, list[Pokemon]] = {}
 
-        # PC data starts at the beginning of the big block (after a small header)
-        # The exact offset for box data is typically 0x0 in the storage block,
-        # but there are box names and wallpaper data before/after.
-        # Box Pokemon data starts at offset 0x0 in most Gen 4 games.
-        pc_data_offset = _PC_OFFSET
+        # HGSS has a larger reserved area before box data (0x88 vs 0x04 for DP/Pt)
+        if "HeartGold" in game or "SoulSilver" in game:
+            pc_data_offset = _HGSS_PC_OFFSET
+        else:
+            pc_data_offset = _PC_OFFSET
 
         for box_idx in range(_NUM_BOXES):
             box_name = f"Box {box_idx + 1}"
@@ -619,16 +620,10 @@ class Gen4Parser(BaseParser):
             )
             return None
 
-        # Validate checksum
+        # Validate checksum — skip slots with mismatches (residual/corrupt data)
         computed_checksum = pokemon_checksum(decrypted_blocks)
         if computed_checksum != stored_checksum:
-            logger.warning(
-                "Pokemon PID=0x%08X checksum mismatch "
-                "(stored=0x%04X, computed=0x%04X). Data may be corrupt.",
-                pid,
-                stored_checksum,
-                computed_checksum,
-            )
+            return None
 
         # --- Unshuffle blocks ---
         a_off, b_off, c_off, d_off = get_block_order(pid)
